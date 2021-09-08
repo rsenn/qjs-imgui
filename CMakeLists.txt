@@ -24,8 +24,7 @@ include_directories(
 
 link_directories(${QUICKJS_LIBRARY_DIR})
 
-add_subdirectory(gl3w)
-
+add_subdirectory(gl3w EXCLUDE_FROM_ALL)
 make_shared_module(
   imgui
   quickjs-imgui.cpp quickjs-imgui.hpp
@@ -37,3 +36,4 @@ make_shared_module(
   imgui/backends/imgui_impl_opengl3.cpp
 )
 target_link_libraries(quickjs-imgui glfw quickjs)
+add_dependencies(quickjs-imgui gl3w)
