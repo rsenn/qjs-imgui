@@ -4,7 +4,7 @@ if(WIN32 OR MINGW)
 endif(WIN32 OR MINGW)
 
 set(QUICKJS_MODULE_CFLAGS "-fvisibility=hidden")
-
+        
 function(config_shared_module TARGET_NAME)
   if(QUICKJS_LIBRARY_DIR)
     target_link_directories(${TARGET_NAME} PRIVATE "${QUICKJS_LIBRARY_DIR}")

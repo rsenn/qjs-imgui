@@ -128,14 +128,16 @@ js_imgui_io_get(JSContext* ctx, JSValueConst this_val, int magic) {
   if(!(io = static_cast<ImGuiIO*>(JS_GetOpaque2(ctx, this_val, js_imgui_io_class_id))))
     return ret;
 
-  switch(magic) {  case IMGUIIO_DELTA_TIME: {
+  switch(magic) {
+    case IMGUIIO_DELTA_TIME: {
       ret = JS_NewFloat64(ctx, io->DeltaTime);
       break;
     }
     case IMGUIIO_INI_SAVING_RATE: {
       ret = JS_NewFloat64(ctx, io->IniSavingRate);
       break;
-    }}
+    }
+  }
 
   return ret;
 }
@@ -148,9 +150,7 @@ js_imgui_io_set(JSContext* ctx, JSValueConst this_val, JSValueConst value, int m
   if(!(io = static_cast<ImGuiIO*>(JS_GetOpaque2(ctx, this_val, js_imgui_io_class_id))))
     return ret;
 
-  switch(magic) {
-  
-  }
+  switch(magic) {}
 
   return ret;
 }
