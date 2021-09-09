@@ -14,6 +14,6 @@ struct imgui;
 #define HIDDEN __attribute__((visibility("hidden")))
 #endif
 
-JSModuleDef* js_init_module_imgui(JSContext*, const char* module_name);
+extern "C" JSModuleDef* js_init_module_imgui(JSContext*, const char* module_name);
 
 #endif /* defined(QUICKJS_IMGUI_H) */
