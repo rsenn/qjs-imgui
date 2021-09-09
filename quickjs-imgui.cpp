@@ -5,26 +5,33 @@
 #include <imgui.h>
 #include <cassert>
 #include <cctype>
+#include <GLFW/glfw3.h>
+
 #include "quickjs-imgui.hpp"
 #include "quickjs-imgui-constants.hpp"
 #include "quickjs-imgui-payload.hpp"
 #include "quickjs-imgui-io.hpp"
 #include "quickjs-imfont.hpp"
+#include "quickjs-imfontatlas.hpp"
 
-#define max(a, b) ((a) > (b) ? (a) : (b))
-extern "C" {
+#include "imgui/backends/imgui_impl_opengl3.h"
+#include "imgui/backends/imgui_impl_glfw.h"
+
+static bool imgui_is_initialized;
+
 enum {
+  IMGUI_INIT,
   IMGUI_CREATE_CONTEXT,
   IMGUI_DESTROY_CONTEXT,
   IMGUI_GET_CURRENT_CONTEXT,
   IMGUI_SET_CURRENT_CONTEXT,
-  IMGUI_DEBUG_CHECK_VERSION_AND_DATA_LAYOUT,
   IMGUI_GET_IO,
   IMGUI_GET_STYLE,
   IMGUI_NEW_FRAME,
   IMGUI_END_FRAME,
   IMGUI_RENDER,
   IMGUI_GET_DRAW_DATA,
+  IMGUI_RENDER_DRAW_DATA,
   IMGUI_SHOW_DEMO_WINDOW,
   IMGUI_SHOW_ABOUT_WINDOW,
   IMGUI_SHOW_METRICS_WINDOW,
@@ -341,6 +348,35 @@ enum {
 };
 
 static void
+js_imgui_init_gl(GLFWwindow* window) {
+  if(!imgui_is_initialized) {
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable vsync
+
+    // Decide GL+GLSL versions
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+    // GL ES 2.0 + GLSL 100
+    const char* glsl_version = "#version 100"
+#elif defined(__APPLE__)
+    // GL 3.2 + GLSL 150
+    const char* glsl_version = "#version 150";
+#else
+    // GL 3.0 + GLSL 130
+    const char* glsl_version = "#version 130";
+#endif
+
+        IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+  }
+
+  imgui_is_initialized = true;
+}
+
+static void
 js_imgui_free_func(JSRuntime* rt, void* opaque, void* ptr) {
   ImGui::MemFree(ptr);
 }
@@ -403,6 +439,34 @@ js_imgui_getcolor(JSContext* ctx, JSValueConst value) {
     JS_FreeCString(ctx, str);
   }
   return vec;
+}
+
+static JSValue
+js_imgui_newptr(JSContext* ctx, void* ptr) {
+  char buf[128];
+  snprintf(buf, sizeof(buf), "%p", ptr);
+  return JS_NewString(ctx, buf);
+}
+
+template<class T>
+static T*
+js_imgui_getptr(JSContext* ctx, JSValueConst value) {
+  const char* str = JS_ToCString(ctx, value);
+  void* ptr = 0;
+  sscanf(str, "%p", &ptr);
+  JS_FreeCString(ctx, str);
+  return static_cast<T*>(ptr);
+}
+
+static ImTextureID
+js_imgui_gettexture(JSContext* ctx, JSValueConst value) {
+  if(JS_IsNumber(value)) {
+    uint64_t id;
+    JS_ToIndex(ctx, &id, value);
+    return ImTextureID(id);
+  }
+
+  return js_imgui_getptr<void>(ctx, value);
 }
 
 static JSValue
@@ -484,16 +548,53 @@ js_imgui_formatargs(JSContext* ctx, int argc, JSValueConst argv[], void* output[
   // JS_FreeCString(ctx, fmt);
 }
 
+#include "quickjs-imgui-style.hpp"
+
 static JSValue
 js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
   JSValue ret = JS_UNDEFINED;
 
   switch(magic) {
-    case IMGUI_CREATE_CONTEXT: break;
-    case IMGUI_DESTROY_CONTEXT: break;
-    case IMGUI_GET_CURRENT_CONTEXT: break;
-    case IMGUI_SET_CURRENT_CONTEXT: break;
-    case IMGUI_DEBUG_CHECK_VERSION_AND_DATA_LAYOUT: break;
+    case IMGUI_INIT: {
+      GLFWwindow* window = 0;
+      if(argc >= 1 && JS_IsObject(argv[0])) {
+        JSValue id = JS_GetPropertyStr(ctx, argv[0], "id");
+
+        if(JS_IsString(id)) {
+          window = js_imgui_getptr<GLFWwindow>(ctx, id);
+        } else {
+          ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
+
+          window = glfwCreateWindow(size.x, size.y, "ImGui", NULL, NULL);
+        }
+      }
+      if(window)
+        js_imgui_init_gl(window);
+      else
+        ret = JS_ThrowInternalError(ctx, "ImGui::Init expecting GLFWwindow*");
+      break;
+    }
+    case IMGUI_CREATE_CONTEXT: {
+      ImFontAtlas* atlas = 0;
+      if(argc >= 1)
+        atlas = js_imfontatlas_data2(ctx, argv[0]);
+      ret = js_imgui_newptr(ctx, ImGui::CreateContext(atlas));
+      break;
+    }
+    case IMGUI_DESTROY_CONTEXT: {
+      ImGuiContext* context = js_imgui_getptr<ImGuiContext>(ctx, argv[0]);
+      ImGui::DestroyContext(context);
+      break;
+    }
+    case IMGUI_GET_CURRENT_CONTEXT: {
+      ret = js_imgui_newptr(ctx, ImGui::GetCurrentContext());
+      break;
+    }
+    case IMGUI_SET_CURRENT_CONTEXT: {
+      ImGuiContext* context = js_imgui_getptr<ImGuiContext>(ctx, argv[0]);
+      ImGui::SetCurrentContext(context);
+      break;
+    }
     case IMGUI_GET_IO: {
       ret = js_imgui_io_wrap(ctx, new ImGuiIO(ImGui::GetIO()));
       break;
@@ -503,6 +604,9 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       break;
     }
     case IMGUI_NEW_FRAME: {
+      ImGui_ImplOpenGL3_NewFrame();
+      ImGui_ImplGlfw_NewFrame();
+
       ImGui::NewFrame();
       break;
     }
@@ -514,11 +618,27 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       ImGui::Render();
       break;
     }
-    case IMGUI_GET_DRAW_DATA: break;
+    case IMGUI_GET_DRAW_DATA: {
+      ret = js_imgui_newptr(ctx, ImGui::GetDrawData());
+      break;
+    };
+    case IMGUI_RENDER_DRAW_DATA: {
+      ImDrawData* data = 0;
+      if(argc >= 1)
+        data = js_imgui_getptr<ImDrawData>(ctx, argv[0]);
+      if(!data)
+        data = ImGui::GetDrawData();
+      ImGui_ImplOpenGL3_RenderDrawData(data);
+      break;
+    };
     case IMGUI_SHOW_DEMO_WINDOW: break;
     case IMGUI_SHOW_ABOUT_WINDOW: break;
     case IMGUI_SHOW_METRICS_WINDOW: break;
-    case IMGUI_SHOW_STYLE_EDITOR: break;
+    case IMGUI_SHOW_STYLE_EDITOR: {
+      ImGuiStyle* style = js_imgui_style_data2(ctx, argv[0]);
+      ImGui::ShowStyleEditor(style);
+      break;
+    }
     case IMGUI_SHOW_STYLE_SELECTOR: {
       const char* label = JS_ToCString(ctx, argv[0]);
       ret = JS_NewBool(ctx, ImGui::ShowStyleSelector(label));
@@ -540,20 +660,24 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       break;
     }
     case IMGUI_STYLE_COLORS_DARK: {
- ImGui::StyleColorsDark(js_imgui_style_data2(ctx, argv[0]));
-braek;
+      ImGui::StyleColorsDark(js_imgui_style_data2(ctx, argv[0]));
+      break;
     }
     case IMGUI_STYLE_COLORS_CLASSIC: {
- ImGui::StyleColorsClassic(js_imgui_style_data2(ctx, argv[0]));
-braek;
+      ImGui::StyleColorsClassic(js_imgui_style_data2(ctx, argv[0]));
+      break;
     }
-    case IMGUI_STYLE_COLORS_LIGHT:  {
- ImGui::StyleColorsLight(js_imgui_style_data2(ctx, argv[0]));
-braek;
+    case IMGUI_STYLE_COLORS_LIGHT: {
+      ImGui::StyleColorsLight(js_imgui_style_data2(ctx, argv[0]));
+      break;
     }
     case IMGUI_BEGIN: {
       const char* name = JS_ToCString(ctx, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::Begin(name));
+      int32_t window_flags = 0;
+      if(argc >= 3)
+        JS_ToInt32(ctx, &window_flags, argv[2]);
+
+      ret = JS_NewBool(ctx, ImGui::Begin(name, 0, window_flags));
       JS_FreeCString(ctx, name);
       break;
     }
@@ -594,16 +718,16 @@ braek;
     }
     case IMGUI_IS_WINDOW_FOCUSED: {
       int32_t flags = 0;
-      if(argc>= 1)
-      JS_ToInt32(ctx, &flags, argv[0]);
+      if(argc >= 1)
+        JS_ToInt32(ctx, &flags, argv[0]);
       ret = JS_NewBool(ctx, ImGui::IsWindowFocused(flags));
       break;
     }
     case IMGUI_IS_WINDOW_HOVERED: {
-         int32_t flags = 0;
-      if(argc>= 1)
-      JS_ToInt32(ctx, &flags, argv[0]);
-   ret = JS_NewBool(ctx, ImGui::IsWindowHovered(flags));
+      int32_t flags = 0;
+      if(argc >= 1)
+        JS_ToInt32(ctx, &flags, argv[0]);
+      ret = JS_NewBool(ctx, ImGui::IsWindowHovered(flags));
       break;
     }
     case IMGUI_GET_WINDOW_DRAW_LIST: break;
@@ -770,8 +894,15 @@ braek;
         JS_ToFloat64(ctx, &center_y_ratio, argv[1]);
       ImGui::SetScrollFromPosX(local_y, center_y_ratio);
     }
-    case IMGUI_PUSH_FONT: break;
-    case IMGUI_POP_FONT: break;
+    case IMGUI_PUSH_FONT: {
+      ImFont* font = js_imfont_data2(ctx, argv[0]);
+      ImGui::PushFont(font);
+      break;
+    }
+    case IMGUI_POP_FONT: {
+      ImGui::PopFont();
+      break;
+    }
     case IMGUI_PUSH_STYLE_COLOR: {
       int32_t idx;
       JS_ToInt32(ctx, &idx, argv[0]);
@@ -818,7 +949,10 @@ braek;
       ret = js_imgui_newimvec4(ctx, ImGui::GetStyleColorVec4(col));
       break;
     }
-    case IMGUI_GET_FONT: break;
+    case IMGUI_GET_FONT: {
+      ret = js_imfont_wrap(ctx, ImGui::GetFont());
+      break;
+    }
     case IMGUI_GET_FONT_SIZE: {
       ret = JS_NewFloat64(ctx, ImGui::GetFontSize());
       break;
@@ -1126,8 +1260,41 @@ braek;
       JS_FreeCString(ctx, str_id);
       break;
     }
-    case IMGUI_IMAGE: break;
-    case IMGUI_IMAGE_BUTTON: break;
+    case IMGUI_IMAGE: {
+      ImTextureID tex = js_imgui_gettexture(ctx, argv[0]);
+      ImVec2 size = js_imgui_getimvec2(ctx, argv[1]);
+      ImVec2 uv0(0, 0), uv1(1, 1);
+      ImVec4 tint_col(1, 1, 1, 1), border_col(0, 0, 0, 0);
+      if(argc >= 3)
+        uv0 = js_imgui_getimvec2(ctx, argv[2]);
+      if(argc >= 4)
+        uv1 = js_imgui_getimvec2(ctx, argv[3]);
+      if(argc >= 5)
+        tint_col = js_imgui_getimvec4(ctx, argv[4]);
+      if(argc >= 6)
+        border_col = js_imgui_getimvec4(ctx, argv[5]);
+      ImGui::Image(tex, size, uv0, uv1, tint_col, border_col);
+      break;
+    }
+    case IMGUI_IMAGE_BUTTON: {
+      ImTextureID tex = js_imgui_gettexture(ctx, argv[0]);
+      ImVec2 size = js_imgui_getimvec2(ctx, argv[1]);
+      ImVec2 uv0(0, 0), uv1(1, 1);
+      int32_t frame_padding = -1;
+      ImVec4 tint_col(1, 1, 1, 1), border_col(0, 0, 0, 0);
+      if(argc >= 3)
+        uv0 = js_imgui_getimvec2(ctx, argv[2]);
+      if(argc >= 4)
+        uv1 = js_imgui_getimvec2(ctx, argv[3]);
+      if(argc >= 5)
+        JS_ToInt32(ctx, &frame_padding, argv[4]);
+      if(argc >= 6)
+        tint_col = js_imgui_getimvec4(ctx, argv[5]);
+      if(argc >= 7)
+        border_col = js_imgui_getimvec4(ctx, argv[6]);
+      ret = JS_NewBool(ctx, ImGui::ImageButton(tex, size, uv0, uv1, frame_padding, tint_col, border_col));
+      break;
+    }
     case IMGUI_CHECKBOX: break;
     case IMGUI_CHECKBOX_FLAGS: break;
     case IMGUI_RADIO_BUTTON: {
@@ -2181,17 +2348,18 @@ braek;
 }
 
 static const JSCFunctionListEntry js_imgui_static_funcs[] = {
-    JS_CFUNC_MAGIC_DEF("CreateContext", 1, js_imgui_functions, IMGUI_CREATE_CONTEXT),
+    JS_CFUNC_MAGIC_DEF("Init", 1, js_imgui_functions, IMGUI_INIT),
+    JS_CFUNC_MAGIC_DEF("CreateContext", 0, js_imgui_functions, IMGUI_CREATE_CONTEXT),
     JS_CFUNC_MAGIC_DEF("DestroyContext", 1, js_imgui_functions, IMGUI_DESTROY_CONTEXT),
     JS_CFUNC_MAGIC_DEF("GetCurrentContext", 0, js_imgui_functions, IMGUI_GET_CURRENT_CONTEXT),
     JS_CFUNC_MAGIC_DEF("SetCurrentContext", 1, js_imgui_functions, IMGUI_SET_CURRENT_CONTEXT),
-    JS_CFUNC_MAGIC_DEF("DebugCheckVersionAndDataLayout", 6, js_imgui_functions, IMGUI_DEBUG_CHECK_VERSION_AND_DATA_LAYOUT),
     JS_CFUNC_MAGIC_DEF("GetIO", 0, js_imgui_functions, IMGUI_GET_IO),
     JS_CFUNC_MAGIC_DEF("GetStyle", 0, js_imgui_functions, IMGUI_GET_STYLE),
     JS_CFUNC_MAGIC_DEF("NewFrame", 0, js_imgui_functions, IMGUI_NEW_FRAME),
     JS_CFUNC_MAGIC_DEF("EndFrame", 0, js_imgui_functions, IMGUI_END_FRAME),
     JS_CFUNC_MAGIC_DEF("Render", 0, js_imgui_functions, IMGUI_RENDER),
     JS_CFUNC_MAGIC_DEF("GetDrawData", 0, js_imgui_functions, IMGUI_GET_DRAW_DATA),
+    JS_CFUNC_MAGIC_DEF("RenderDrawData", 0, js_imgui_functions, IMGUI_RENDER_DRAW_DATA),
     JS_CFUNC_MAGIC_DEF("ShowDemoWindow", 1, js_imgui_functions, IMGUI_SHOW_DEMO_WINDOW),
     JS_CFUNC_MAGIC_DEF("ShowAboutWindow", 1, js_imgui_functions, IMGUI_SHOW_ABOUT_WINDOW),
     JS_CFUNC_MAGIC_DEF("ShowMetricsWindow", 1, js_imgui_functions, IMGUI_SHOW_METRICS_WINDOW),
@@ -2518,7 +2686,8 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
 };
 
 #include "quickjs-imgui-inputtextcallbackdata.hpp"
-#include "quickjs-imgui-style.hpp"
+
+extern "C" {
 
 int
 js_imgui_init(JSContext* ctx, JSModuleDef* m) {
@@ -2568,26 +2737,30 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   JS_SetPropertyFunctionList(ctx, imfont_proto, js_imfont_funcs, countof(js_imfont_funcs));
   JS_SetClassProto(ctx, js_imfont_class_id, imfont_proto);
 
+  JS_NewClassID(&js_imfontatlas_class_id);
+  JS_NewClass(JS_GetRuntime(ctx), js_imfontatlas_class_id, &js_imfontatlas_class);
+
+  imfontatlas_ctor = JS_NewCFunction2(ctx, js_imfontatlas_constructor, "ImFontAtlas", 1, JS_CFUNC_constructor, 0);
+  imfontatlas_proto = JS_NewObject(ctx);
+
+  JS_SetPropertyFunctionList(ctx, imfontatlas_proto, js_imfontatlas_funcs, countof(js_imfontatlas_funcs));
+  JS_SetClassProto(ctx, js_imfontatlas_class_id, imfontatlas_proto);
+
   if(m) {
     JS_SetModuleExport(ctx, m, "ImGuiIO", imgui_io_ctor);
     JS_SetModuleExport(ctx, m, "ImGuiStyle", imgui_style_ctor);
     JS_SetModuleExport(ctx, m, "ImGuiInputTextCallbackData", imgui_inputtextcallbackdata_ctor);
     JS_SetModuleExport(ctx, m, "ImGuiPayload", imgui_payload_ctor);
     JS_SetModuleExport(ctx, m, "ImFont", imfont_ctor);
+    JS_SetModuleExport(ctx, m, "ImFontAtlas", imfontatlas_ctor);
     JS_SetModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
   }
 
   return 0;
 }
 
-#ifdef JS_SHARED_LIBRARY
-#define JS_INIT_MODULE js_init_module
-#else
-#define JS_INIT_MODULE js_init_module_imgui
-#endif
-
 VISIBLE JSModuleDef*
-JS_INIT_MODULE(JSContext* ctx, const char* module_name) {
+js_init_module(JSContext* ctx, const char* module_name) {
   JSModuleDef* m;
   if(!(m = JS_NewCModule(ctx, module_name, &js_imgui_init)))
     return m;
@@ -2596,6 +2769,7 @@ JS_INIT_MODULE(JSContext* ctx, const char* module_name) {
   JS_AddModuleExport(ctx, m, "ImGuiInputTextCallbackData");
   JS_AddModuleExport(ctx, m, "ImGuiPayload");
   JS_AddModuleExport(ctx, m, "ImFont");
+  JS_AddModuleExport(ctx, m, "ImFontAtlas");
   JS_AddModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
   return m;
 }

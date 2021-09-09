@@ -4,7 +4,10 @@
 struct imgui;
 
 #include <quickjs.h>
+
+extern "C" {
 #include <cutils.h>
+}
 
 #if defined(_WIN32) || defined(__MINGW32__)
 #define VISIBLE __declspec(dllexport)

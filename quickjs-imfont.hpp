@@ -4,20 +4,20 @@
 thread_local VISIBLE JSClassID js_imfont_class_id = 0;
 thread_local JSValue imfont_proto = {JS_TAG_UNDEFINED}, imfont_ctor = {JS_TAG_UNDEFINED};
 
-enum { 
+enum {
   FONT_FIND_GLYPH,
-FONT_FIND_GLYPH_NO_FALLBACK,
-FONT_CALC_TEXT_SIZE_A,
-FONT_CALC_WORD_WRAP_POSITION_A,
-FONT_RENDER_CHAR,
-FONT_RENDER_TEXT,
-FONT_BUILD_LOOKUP_TABLE,
-FONT_CLEAR_OUTPUT_DATA,
-FONT_GROW_INDEX,
-FONT_ADD_GLYPH,
-FONT_ADD_REMAP_CHAR,
-FONT_SET_GLYPH_VISIBLE,
-FONT_IS_GLYPH_RANGE_UNUSED,
+  FONT_FIND_GLYPH_NO_FALLBACK,
+  FONT_CALC_TEXT_SIZE_A,
+  FONT_CALC_WORD_WRAP_POSITION_A,
+  FONT_RENDER_CHAR,
+  FONT_RENDER_TEXT,
+  FONT_BUILD_LOOKUP_TABLE,
+  FONT_CLEAR_OUTPUT_DATA,
+  FONT_GROW_INDEX,
+  FONT_ADD_GLYPH,
+  FONT_ADD_REMAP_CHAR,
+  FONT_SET_GLYPH_VISIBLE,
+  FONT_IS_GLYPH_RANGE_UNUSED,
 };
 
 static inline ImFont*
@@ -68,9 +68,7 @@ js_imfont_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueCons
   if(!(payload = js_imfont_data2(ctx, this_val)))
     return ret;
 
-  switch(magic) {
-  
-  }
+  switch(magic) {}
 
   return ret;
 }
@@ -81,19 +79,19 @@ static JSClassDef js_imfont_class = {
 };
 
 static const JSCFunctionListEntry js_imfont_funcs[] = {
-   JS_CFUNC_MAGIC_DEF("FindGlyph", 1, js_imfont_functions, FONT_FIND_GLYPH),
-JS_CFUNC_MAGIC_DEF("FindGlyphNoFallback", 1, js_imfont_functions, FONT_FIND_GLYPH_NO_FALLBACK),
-JS_CFUNC_MAGIC_DEF("CalcTextSizeA", 4, js_imfont_functions, FONT_CALC_TEXT_SIZE_A),
-JS_CFUNC_MAGIC_DEF("CalcWordWrapPositionA", 4, js_imfont_functions, FONT_CALC_WORD_WRAP_POSITION_A),
-JS_CFUNC_MAGIC_DEF("RenderChar", 5, js_imfont_functions, FONT_RENDER_CHAR),
-JS_CFUNC_MAGIC_DEF("RenderText", 7, js_imfont_functions, FONT_RENDER_TEXT),
-JS_CFUNC_MAGIC_DEF("BuildLookupTable", 0, js_imfont_functions, FONT_BUILD_LOOKUP_TABLE),
-JS_CFUNC_MAGIC_DEF("ClearOutputData", 0, js_imfont_functions, FONT_CLEAR_OUTPUT_DATA),
-JS_CFUNC_MAGIC_DEF("GrowIndex", 1, js_imfont_functions, FONT_GROW_INDEX),
-JS_CFUNC_MAGIC_DEF("AddGlyph", 11, js_imfont_functions, FONT_ADD_GLYPH),
-JS_CFUNC_MAGIC_DEF("AddRemapChar", 2, js_imfont_functions, FONT_ADD_REMAP_CHAR),
-JS_CFUNC_MAGIC_DEF("SetGlyphVisible", 2, js_imfont_functions, FONT_SET_GLYPH_VISIBLE),
-JS_CFUNC_MAGIC_DEF("IsGlyphRangeUnused", 2, js_imfont_functions, FONT_IS_GLYPH_RANGE_UNUSED),
+    JS_CFUNC_MAGIC_DEF("FindGlyph", 1, js_imfont_functions, FONT_FIND_GLYPH),
+    JS_CFUNC_MAGIC_DEF("FindGlyphNoFallback", 1, js_imfont_functions, FONT_FIND_GLYPH_NO_FALLBACK),
+    JS_CFUNC_MAGIC_DEF("CalcTextSizeA", 4, js_imfont_functions, FONT_CALC_TEXT_SIZE_A),
+    JS_CFUNC_MAGIC_DEF("CalcWordWrapPositionA", 4, js_imfont_functions, FONT_CALC_WORD_WRAP_POSITION_A),
+    JS_CFUNC_MAGIC_DEF("RenderChar", 5, js_imfont_functions, FONT_RENDER_CHAR),
+    JS_CFUNC_MAGIC_DEF("RenderText", 7, js_imfont_functions, FONT_RENDER_TEXT),
+    JS_CFUNC_MAGIC_DEF("BuildLookupTable", 0, js_imfont_functions, FONT_BUILD_LOOKUP_TABLE),
+    JS_CFUNC_MAGIC_DEF("ClearOutputData", 0, js_imfont_functions, FONT_CLEAR_OUTPUT_DATA),
+    JS_CFUNC_MAGIC_DEF("GrowIndex", 1, js_imfont_functions, FONT_GROW_INDEX),
+    JS_CFUNC_MAGIC_DEF("AddGlyph", 11, js_imfont_functions, FONT_ADD_GLYPH),
+    JS_CFUNC_MAGIC_DEF("AddRemapChar", 2, js_imfont_functions, FONT_ADD_REMAP_CHAR),
+    JS_CFUNC_MAGIC_DEF("SetGlyphVisible", 2, js_imfont_functions, FONT_SET_GLYPH_VISIBLE),
+    JS_CFUNC_MAGIC_DEF("IsGlyphRangeUnused", 2, js_imfont_functions, FONT_IS_GLYPH_RANGE_UNUSED),
 
 };
 
