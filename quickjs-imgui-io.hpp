@@ -17,6 +17,13 @@ js_imgui_io_data2(JSContext* ctx, JSValueConst value) {
 }
 
 static JSValue
+js_imgui_io_wrap(JSContext* ctx, ImGuiIO* io) {
+  JSValue obj = JS_NewObjectProtoClass(ctx, imgui_io_proto, js_imgui_io_class_id);
+  JS_SetOpaque(obj, io);
+  return obj;
+}
+
+static JSValue
 js_imgui_io_constructor(JSContext* ctx, JSValueConst new_target, int argc, JSValueConst argv[]) {
   ImGuiIO* io;
   JSValue proto, obj = JS_UNDEFINED;

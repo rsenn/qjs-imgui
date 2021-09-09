@@ -8,6 +8,8 @@
 #include "quickjs-imgui.hpp"
 #include "quickjs-imgui-constants.hpp"
 #include "quickjs-imgui-payload.hpp"
+#include "quickjs-imgui-io.hpp"
+#include "quickjs-imfont.hpp"
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 extern "C" {
@@ -492,8 +494,14 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     case IMGUI_GET_CURRENT_CONTEXT: break;
     case IMGUI_SET_CURRENT_CONTEXT: break;
     case IMGUI_DEBUG_CHECK_VERSION_AND_DATA_LAYOUT: break;
-    case IMGUI_GET_IO: break;
-    case IMGUI_GET_STYLE: break;
+    case IMGUI_GET_IO: {
+      ret = js_imgui_io_wrap(ctx, new ImGuiIO(ImGui::GetIO()));
+      break;
+    }
+    case IMGUI_GET_STYLE: {
+      ret = js_imgui_style_wrap(ctx, new ImGuiStyle(ImGui::GetStyle()));
+      break;
+    }
     case IMGUI_NEW_FRAME: {
       ImGui::NewFrame();
       break;
@@ -531,9 +539,18 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       ret = JS_NewString(ctx, ImGui::GetVersion());
       break;
     }
-    case IMGUI_STYLE_COLORS_DARK: break;
-    case IMGUI_STYLE_COLORS_CLASSIC: break;
-    case IMGUI_STYLE_COLORS_LIGHT: break;
+    case IMGUI_STYLE_COLORS_DARK: {
+ ImGui::StyleColorsDark(js_imgui_style_data2(ctx, argv[0]));
+braek;
+    }
+    case IMGUI_STYLE_COLORS_CLASSIC: {
+ ImGui::StyleColorsClassic(js_imgui_style_data2(ctx, argv[0]));
+braek;
+    }
+    case IMGUI_STYLE_COLORS_LIGHT:  {
+ ImGui::StyleColorsLight(js_imgui_style_data2(ctx, argv[0]));
+braek;
+    }
     case IMGUI_BEGIN: {
       const char* name = JS_ToCString(ctx, argv[0]);
       ret = JS_NewBool(ctx, ImGui::Begin(name));
@@ -576,11 +593,17 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       break;
     }
     case IMGUI_IS_WINDOW_FOCUSED: {
-      ret = JS_NewBool(ctx, ImGui::IsWindowFocused());
+      int32_t flags = 0;
+      if(argc>= 1)
+      JS_ToInt32(ctx, &flags, argv[0]);
+      ret = JS_NewBool(ctx, ImGui::IsWindowFocused(flags));
       break;
     }
     case IMGUI_IS_WINDOW_HOVERED: {
-      ret = JS_NewBool(ctx, ImGui::IsWindowHovered());
+         int32_t flags = 0;
+      if(argc>= 1)
+      JS_ToInt32(ctx, &flags, argv[0]);
+   ret = JS_NewBool(ctx, ImGui::IsWindowHovered(flags));
       break;
     }
     case IMGUI_GET_WINDOW_DRAW_LIST: break;
@@ -1742,7 +1765,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       int32_t flags = 0;
       if(argc >= 2)
         JS_ToInt32(ctx, &flags, argv[1]);
-      ret = js_imgui_payload_wrap(ctx, *ImGui::AcceptDragDropPayload(type, flags));
+      ret = js_imgui_payload_wrap(ctx, new ImGuiPayload(*ImGui::AcceptDragDropPayload(type, flags)));
       JS_FreeCString(ctx, type);
       break;
     }
@@ -1751,7 +1774,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       break;
     }
     case IMGUI_GET_DRAG_DROP_PAYLOAD: {
-      ret = js_imgui_payload_wrap(ctx, *ImGui::GetDragDropPayload());
+      ret = js_imgui_payload_wrap(ctx, new ImGuiPayload(*ImGui::GetDragDropPayload()));
       break;
     }
     case IMGUI_BEGIN_DISABLED: {
@@ -2494,7 +2517,7 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
 
 };
 
-#include "quickjs-imgui-io.hpp"
+#include "quickjs-imgui-inputtextcallbackdata.hpp"
 #include "quickjs-imgui-style.hpp"
 
 int
@@ -2518,6 +2541,15 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   JS_SetPropertyFunctionList(ctx, imgui_style_proto, js_imgui_style_funcs, countof(js_imgui_style_funcs));
   JS_SetClassProto(ctx, js_imgui_style_class_id, imgui_style_proto);
 
+  JS_NewClassID(&js_imgui_inputtextcallbackdata_class_id);
+  JS_NewClass(JS_GetRuntime(ctx), js_imgui_inputtextcallbackdata_class_id, &js_imgui_inputtextcallbackdata_class);
+
+  imgui_inputtextcallbackdata_ctor = JS_NewCFunction2(ctx, js_imgui_inputtextcallbackdata_constructor, "ImGuiPayload", 1, JS_CFUNC_constructor, 0);
+  imgui_inputtextcallbackdata_proto = JS_NewObject(ctx);
+
+  JS_SetPropertyFunctionList(ctx, imgui_inputtextcallbackdata_proto, js_imgui_inputtextcallbackdata_funcs, countof(js_imgui_inputtextcallbackdata_funcs));
+  JS_SetClassProto(ctx, js_imgui_inputtextcallbackdata_class_id, imgui_inputtextcallbackdata_proto);
+
   JS_NewClassID(&js_imgui_payload_class_id);
   JS_NewClass(JS_GetRuntime(ctx), js_imgui_payload_class_id, &js_imgui_payload_class);
 
@@ -2527,10 +2559,21 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   JS_SetPropertyFunctionList(ctx, imgui_payload_proto, js_imgui_payload_funcs, countof(js_imgui_payload_funcs));
   JS_SetClassProto(ctx, js_imgui_payload_class_id, imgui_payload_proto);
 
+  JS_NewClassID(&js_imfont_class_id);
+  JS_NewClass(JS_GetRuntime(ctx), js_imfont_class_id, &js_imfont_class);
+
+  imfont_ctor = JS_NewCFunction2(ctx, js_imfont_constructor, "ImFont", 1, JS_CFUNC_constructor, 0);
+  imfont_proto = JS_NewObject(ctx);
+
+  JS_SetPropertyFunctionList(ctx, imfont_proto, js_imfont_funcs, countof(js_imfont_funcs));
+  JS_SetClassProto(ctx, js_imfont_class_id, imfont_proto);
+
   if(m) {
     JS_SetModuleExport(ctx, m, "ImGuiIO", imgui_io_ctor);
     JS_SetModuleExport(ctx, m, "ImGuiStyle", imgui_style_ctor);
+    JS_SetModuleExport(ctx, m, "ImGuiInputTextCallbackData", imgui_inputtextcallbackdata_ctor);
     JS_SetModuleExport(ctx, m, "ImGuiPayload", imgui_payload_ctor);
+    JS_SetModuleExport(ctx, m, "ImFont", imfont_ctor);
     JS_SetModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
   }
 
@@ -2550,7 +2593,9 @@ JS_INIT_MODULE(JSContext* ctx, const char* module_name) {
     return m;
   JS_AddModuleExport(ctx, m, "ImGuiIO");
   JS_AddModuleExport(ctx, m, "ImGuiStyle");
+  JS_AddModuleExport(ctx, m, "ImGuiInputTextCallbackData");
   JS_AddModuleExport(ctx, m, "ImGuiPayload");
+  JS_AddModuleExport(ctx, m, "ImFont");
   JS_AddModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
   return m;
 }

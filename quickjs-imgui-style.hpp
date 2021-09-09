@@ -55,6 +55,13 @@ js_imgui_style_data2(JSContext* ctx, JSValueConst value) {
 }
 
 static JSValue
+js_imgui_style_wrap(JSContext* ctx, ImGuiStyle* style) {
+  JSValue obj = JS_NewObjectProtoClass(ctx, imgui_style_proto, js_imgui_style_class_id);
+  JS_SetOpaque(obj, style);
+  return obj;
+}
+
+static JSValue
 js_imgui_style_constructor(JSContext* ctx, JSValueConst new_target, int argc, JSValueConst argv[]) {
   JSValue proto, obj = JS_UNDEFINED;
   ImGuiStyle* style = new ImGuiStyle();

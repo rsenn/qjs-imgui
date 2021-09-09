@@ -17,9 +17,9 @@ js_imgui_payload_data2(JSContext* ctx, JSValueConst value) {
 }
 
 static JSValue
-js_imgui_payload_wrap(JSContext* ctx, const ImGuiPayload& payload) {
+js_imgui_payload_wrap(JSContext* ctx, ImGuiPayload* payload) {
   JSValue obj = JS_NewObjectProtoClass(ctx, imgui_payload_proto, js_imgui_payload_class_id);
-  JS_SetOpaque(obj, new ImGuiPayload(payload));
+  JS_SetOpaque(obj, payload);
   return obj;
 }
 
