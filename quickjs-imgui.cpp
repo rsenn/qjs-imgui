@@ -6,6 +6,9 @@
 #include <cassert>
 #include <cctype>
 #include "quickjs-imgui.hpp"
+#include "quickjs-imgui-constants.hpp"
+#include "quickjs-imgui-io.hpp"
+#include "quickjs-imgui-style.hpp"
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 extern "C" {
@@ -859,7 +862,6 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       assert(count <= 32);
       void* a[count];
       js_imgui_formatargs(ctx, argc, argv, a);
-
       ImGui::Text((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
       break;
     }
@@ -873,7 +875,6 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       ImVec2 size(0, 0);
       if(argc >= 2)
         size = js_imgui_getimvec2(ctx, argv[1]);
-
       ret = JS_NewBool(ctx, ImGui::Button(label, size));
       JS_FreeCString(ctx, label);
       break;
@@ -892,7 +893,6 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         size = js_imgui_getimvec2(ctx, argv[1]);
       if(argc >= 3)
         JS_ToInt32(ctx, &flags, argv[2]);
-
       ret = JS_NewBool(ctx, ImGui::InvisibleButton(str_id, size, flags));
       JS_FreeCString(ctx, str_id);
       break;
@@ -901,9 +901,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       const char* str_id = JS_ToCString(ctx, argv[0]);
       int32_t dir = 0;
       if(argc >= 2)
-
         JS_ToInt32(ctx, &dir, argv[1]);
-
       ret = JS_NewBool(ctx, ImGui::ArrowButton(str_id, dir));
       JS_FreeCString(ctx, str_id);
       break;
@@ -915,7 +913,6 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     case IMGUI_RADIO_BUTTON: {
       const char* label = JS_ToCString(ctx, argv[0]);
       bool active = JS_ToBool(ctx, argv[1]);
-
       ret = JS_NewBool(ctx, ImGui::RadioButton(label, active));
       JS_FreeCString(ctx, label);
       break;
@@ -1072,7 +1069,6 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     case IMGUI_TABLE_SET_COLUMN_ENABLED: break;
     case IMGUI_TABLE_SET_BG_COLOR: break;
     case IMGUI_BUILD_LOOKUP_TABLE: break;
-
     case IMGUI_CLOSE_CURRENT_POPUP: {
       ImGui::CloseCurrentPopup();
       break;
@@ -1260,8 +1256,6 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
 
   return ret;
 }
-
-#include "quickjs-imgui-constants.hpp"
 
 static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_CFUNC_MAGIC_DEF("CreateContext", 1, js_imgui_functions, IMGUI_CREATE_CONTEXT),
@@ -1606,7 +1600,26 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
 int
 js_imgui_init(JSContext* ctx, JSModuleDef* m) {
 
+  JS_NewClassID(&js_imgui_io_class_id);
+  JS_NewClass(JS_GetRuntime(ctx), js_imgui_io_class_id, &js_imgui_io_class);
+
+  imgui_io_ctor = JS_NewCFunction2(ctx, js_imgui_io_constructor, "ImGuiIO", 1, JS_CFUNC_constructor, 0);
+  imgui_io_proto = JS_NewObject(ctx);
+
+  JS_SetPropertyFunctionList(ctx, imgui_io_proto, js_imgui_io_funcs, countof(js_imgui_io_funcs));
+  JS_SetClassProto(ctx, js_imgui_io_class_id, imgui_io_proto);
+
+  JS_NewClassID(&js_imgui_style_class_id);
+  JS_NewClass(JS_GetRuntime(ctx), js_imgui_style_class_id, &js_imgui_style_class);
+
+  imgui_style_ctor = JS_NewCFunction2(ctx, js_imgui_style_constructor, "ImGuiStyle", 1, JS_CFUNC_constructor, 0);
+  imgui_style_proto = JS_NewObject(ctx);
+
+  JS_SetPropertyFunctionList(ctx, imgui_style_proto, js_imgui_style_funcs, countof(js_imgui_style_funcs));
+  JS_SetClassProto(ctx, js_imgui_style_class_id, imgui_style_proto);
+
   if(m) {
+    JS_SetModuleExport(ctx, m, "ImGuiIO", imgui_io_ctor);
     JS_SetModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
   }
 
@@ -1624,6 +1637,7 @@ JS_INIT_MODULE(JSContext* ctx, const char* module_name) {
   JSModuleDef* m;
   if(!(m = JS_NewCModule(ctx, module_name, &js_imgui_init)))
     return m;
+  JS_AddModuleExport(ctx, m, "ImGuiIO");
   JS_AddModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
   return m;
 }
