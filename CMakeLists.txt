@@ -10,7 +10,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/JSBindings.cmake)
 
 find_quickjs()
 
-find_package(glfw3 3.2 REQUIRED)
+find_package(glfw3 3.1 REQUIRED)
 find_package(OpenGL REQUIRED)
 
 set(CMAKE_CXX_STANDARD 11)
