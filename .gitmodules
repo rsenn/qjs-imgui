@@ -1,8 +1,8 @@
 [submodule "gl3w"]
 	path = gl3w
-	url = https://github.com/rsenn/gl3w.git
+	url = git@github.com:rsenn/gl3w.git
 	branch = main
 [submodule "imgui"]
 	path = imgui
-	url = https://github.com/rsenn/imgui.git
+	url = git@github.com:rsenn/imgui.git
 	branch = main
