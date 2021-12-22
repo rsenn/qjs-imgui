@@ -10,7 +10,13 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/JSBindings.cmake)
 
 find_quickjs()
 
-find_package(glfw3 3.1 REQUIRED)
+include(FindPkgConfig)
+pkg_search_module(GLFW glfw3)
+
+set(GLFW_LIBRARY "${pkgcfg_lib_GLFW_glfw3}")
+message(STATUS "GLFW_LIBRARY: ${GLFW_LIBRARY}")
+
+#find_package(glfw3 3.1 REQUIRED)
 find_package(OpenGL REQUIRED)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -24,5 +30,5 @@ add_subdirectory(gl3w EXCLUDE_FROM_ALL)
 make_shared_module(
   imgui quickjs-imgui.cpp quickjs-imgui.hpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp
   imgui/imgui_widgets.cpp imgui/imgui_demo.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
-target_link_libraries(quickjs-imgui glfw quickjs)
+target_link_libraries(quickjs-imgui ${GLFW_LIBRARY} ${QUICKJS_LIBRARY})
 add_dependencies(quickjs-imgui gl3w)

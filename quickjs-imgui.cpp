@@ -2331,7 +2331,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     }
     case IMGUI_SET_ALLOCATOR_FUNCTIONS: break;
     case IMGUI_MEM_ALLOC: {
-      size_t len;
+      uint64_t len;
       void* data;
       JS_ToIndex(ctx, &len, argv[0]);
       data = ImGui::MemAlloc(len);
