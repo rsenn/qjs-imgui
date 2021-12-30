@@ -7,6 +7,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/check-flags.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/QuickJSModule.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindQuickJS.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/JSBindings.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/UseMultiArch.cmake)
 
 find_quickjs()
 
@@ -32,3 +33,16 @@ make_shared_module(
   imgui/imgui_widgets.cpp imgui/imgui_demo.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
 target_link_libraries(quickjs-imgui ${GLFW_LIBRARY} ${QUICKJS_LIBRARY})
 add_dependencies(quickjs-imgui gl3w)
+
+
+if(NOT CMAKE_INSTALL_LIBDIR)
+  set(CMAKE_INSTALL_LIBDIR lib)
+endif(NOT CMAKE_INSTALL_LIBDIR)
+if(NOT QUICKJS_C_MODULE_DIR)
+  set(QUICKJS_C_MODULE_DIR "${CMAKE_INSTALL_LIBDIR}/quickjs")
+endif(NOT QUICKJS_C_MODULE_DIR)
+
+ 
+install(TARGETS quickjs-imgui DESTINATION "${QUICKJS_C_MODULE_DIR}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
+                                                             GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+
