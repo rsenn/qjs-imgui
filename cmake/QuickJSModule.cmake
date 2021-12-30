@@ -40,7 +40,7 @@ function(compile_module SOURCE)
 endfunction(compile_module SOURCE)
 
 function(make_module FNAME)
-  #message(STATUS "Building QuickJS module: ${FNAME}")
+  message(STATUS "Building QuickJS module: ${FNAME}")
   string(REGEX REPLACE "_" "-" NAME "${FNAME}")
   string(REGEX REPLACE "-" "_" VNAME "${FNAME}")
   string(TOUPPER "${FNAME}" UUNAME)
@@ -50,12 +50,14 @@ function(make_module FNAME)
 
   if(ARGN)
     set(SOURCES ${ARGN} ${${VNAME}_SOURCES})
-    set(DEPS ${ARGN} ${${VNAME}_DEPS})
   else(ARGN)
     set(SOURCES quickjs-${NAME}.c ${${VNAME}_SOURCES})
   endif(ARGN)
-
-  #dump(VNAME ${VNAME}_SOURCES SOURCES)
+  set(LIBRARIES ${${VNAME}_LIBRARIES})
+  if(LIBRARIES)
+    message(STATUS "Target ${VNAME} libraries: ${LIBRARIES}")
+  endif(LIBRARIES)
+  set(DEPS ${${VNAME}_DEPS})
 
   if(BUILD_SHARED_MODULES)
     add_library(${TARGET_NAME} SHARED ${SOURCES})
@@ -67,7 +69,7 @@ function(make_module FNAME)
                                                       CONFIG_PREFIX="${QUICKJS_INSTALL_PREFIX}")
 
     target_link_directories(${TARGET_NAME} PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
-    target_link_libraries(${TARGET_NAME} PUBLIC ${QUICKJS_LIBRARY})
+    target_link_libraries(${TARGET_NAME} PUBLIC ${LIBRARIES} ${QUICKJS_LIBRARY})
 
     #message("C module dir: ${QUICKJS_C_MODULE_DIR}")
     install(TARGETS ${TARGET_NAME} DESTINATION "${QUICKJS_C_MODULE_DIR}"
@@ -98,3 +100,14 @@ function(make_module FNAME)
   target_link_libraries(${TARGET_NAME}-static PUBLIC ${QUICKJS_LIBRARY})
 
 endfunction()
+
+if(WASI OR EMSCRIPTEN)
+  set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
+  option(BUILD_SHARED_MODULES "Build shared modules" OFF)
+else(WASI OR EMSCRIPTEN)
+  option(BUILD_SHARED_MODULES "Build shared modules" ON)
+endif(WASI OR EMSCRIPTEN)
+
+if(WIN32 OR MINGW)
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+endif(WIN32 OR MINGW)
