@@ -399,6 +399,169 @@
 	},
 	"buffers":
 	[
+		{
+			"file": "CMakeLists.txt",
+			"settings":
+			{
+				"buffer_size": 1820,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			},
+			"undo_stack":
+			[
+				[
+					3,
+					1,
+					"insert",
+					{
+						"characters": "\n\n"
+					},
+					"AgAAAMEEAAAAAAAAwgQAAAAAAAAAAAAAwgQAAAAAAADDBAAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAAwQQAAAAAAADBBAAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					6,
+					1,
+					"paste",
+					null,
+					"AQAAAMIEAAAAAAAAtgYAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAAwgQAAAAAAADCBAAAAAAAAAAAAAAAAAAA"
+				],
+				[
+					15,
+					1,
+					"insert",
+					{
+						"characters": " "
+					},
+					"AgAAAOUFAAAAAAAA5gUAAAAAAAAAAAAA5gUAAAAAAADmBQAAAAAAAAkAAAAgcWpzLWdsZnc",
+					"AQAAAAAAAAABAAAA5QUAAAAAAADuBQAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					16,
+					1,
+					"paste",
+					null,
+					"AQAAAOYFAAAAAAAA8wUAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAA5gUAAAAAAADmBQAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					33,
+					1,
+					"insert",
+					{
+						"characters": " "
+					},
+					"AgAAAJwFAAAAAAAAnQUAAAAAAAAAAAAAnQUAAAAAAACdBQAAAAAAADkAAABtZXNzYWdlKCJRVUlDS0pTX0NfTU9EVUxFX0RJUjogJHtRVUlDS0pTX0NfTU9EVUxFX0RJUn0iKQo",
+					"AQAAAAAAAAABAAAAnAUAAAAAAADVBQAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					42,
+					1,
+					"paste",
+					null,
+					"AQAAAG8BAAAAAAAArQEAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAAbwEAAAAAAABvAQAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					63,
+					1,
+					"paste",
+					null,
+					"AQAAAK0BAAAAAAAAOgIAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAArQEAAAAAAACtAQAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					65,
+					1,
+					"left_delete",
+					null,
+					"AQAAAKwBAAAAAAAArAEAAAAAAAABAAAACg",
+					"AQAAAAAAAAABAAAArQEAAAAAAACtAQAAAAAAAAAAAAAAgFtA"
+				],
+				[
+					79,
+					1,
+					"left_delete",
+					null,
+					"AQAAAIACAAAAAAAAgAIAAAAAAAAtAAAAc2V0KEdMRldfTElCUkFSWSAiJHtwa2djZmdfbGliX0dMRldfZ2xmdzN9IikK",
+					"AQAAAAAAAAABAAAAgAIAAAAAAACtAgAAAAAAAAAAAAAAAAAA"
+				],
+				[
+					81,
+					1,
+					"left_delete",
+					null,
+					"AQAAAEkCAAAAAAAASQIAAAAAAAA3AAAACmluY2x1ZGUoRmluZFBrZ0NvbmZpZykKcGtnX3NlYXJjaF9tb2R1bGUoR0xGVyBnbGZ3MykKCg",
+					"AQAAAAAAAAABAAAAgAIAAAAAAABJAgAAAAAAAAAAAAAAAAAA"
+				],
+				[
+					82,
+					1,
+					"insert",
+					{
+						"characters": "\n"
+					},
+					"AQAAAEkCAAAAAAAASgIAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAASQIAAAAAAABJAgAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					84,
+					1,
+					"left_delete",
+					null,
+					"AQAAAEoCAAAAAAAASgIAAAAAAAAwAAAAbWVzc2FnZShTVEFUVVMgIkdMRldfTElCUkFSWTogJHtHTEZXX0xJQlJBUll9IikK",
+					"AQAAAAAAAAABAAAASgIAAAAAAAB6AgAAAAAAAAAAAAAAAAAA"
+				],
+				[
+					94,
+					1,
+					"insert",
+					{
+						"characters": "\n"
+					},
+					"AQAAADkCAAAAAAAAOgIAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAAOQIAAAAAAAA5AgAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					95,
+					1,
+					"paste",
+					null,
+					"AQAAADoCAAAAAAAAmgIAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAAOgIAAAAAAAA6AgAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					96,
+					1,
+					"insert",
+					{
+						"characters": "\n"
+					},
+					"AQAAAJoCAAAAAAAAmwIAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAAmgIAAAAAAACaAgAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					99,
+					1,
+					"left_delete",
+					null,
+					"AQAAAKoCAAAAAAAAqgIAAAAAAAABAAAACg",
+					"AQAAAAAAAAABAAAAqwIAAAAAAACrAgAAAAAAAAAAAAAAAAAA"
+				]
+			]
+		},
+		{
+			"file": "cmake/FindGLFW.cmake",
+			"settings":
+			{
+				"buffer_size": 1799,
+				"line_ending": "Unix"
+			},
+			"undo_stack":
+			[
+			]
+		}
 	],
 	"build_system": "",
 	"build_system_choices":
@@ -552,7 +715,8 @@
 	},
 	"expanded_folders":
 	[
-		"/home/roman/Projects/plot-cv/qjs-imgui"
+		"/home/roman/Projects/plot-cv/quickjs/qjs-imgui",
+		"/home/roman/Projects/plot-cv/quickjs/qjs-imgui/cmake"
 	],
 	"file_history":
 	[
@@ -687,7 +851,7 @@
 	],
 	"find":
 	{
-		"height": 28.0
+		"height": 29.0
 	},
 	"find_in_files":
 	{
@@ -722,12 +886,103 @@
 		{
 			"sheets":
 			[
+				{
+					"buffer": 0,
+					"file": "CMakeLists.txt",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1820,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								682,
+								682
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "./",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								}
+							],
+							"function_name_status_row": 19,
+							"syntax": "Packages/User/Themes/CMake.sublime-syntax",
+							"tab_size": 2,
+							"tabs_extra_last_activated": 1640844872.94,
+							"tabs_extra_last_activated_sheet_index": 0,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "cmake/FindGLFW.cmake",
+					"selected": true,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1799,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								613,
+								630
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "./",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								}
+							],
+							"function_name_status_row": 22,
+							"syntax": "Packages/User/Themes/CMake.sublime-syntax",
+							"tab_size": 2,
+							"tabs_extra_last_activated": 1640845563.44,
+							"tabs_extra_last_activated_sheet_index": 1,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"stack_multiselect": false,
+					"type": "text"
+				}
 			]
 		}
 	],
 	"incremental_find":
 	{
-		"height": 28.0
+		"height": 29.0
 	},
 	"input":
 	{
@@ -780,7 +1035,7 @@
 	"project": "qjs-imgui.sublime-project",
 	"replace":
 	{
-		"height": 52.0
+		"height": 54.0
 	},
 	"save_all_on_build": true,
 	"select_file":
