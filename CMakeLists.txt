@@ -8,14 +8,16 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/QuickJSModule.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindQuickJS.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/JSBindings.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/UseMultiArch.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLEW.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLFW.cmake)
+
+find_glew()
+find_glfw()
+
+message(STATUS "GLEW_LIBRARY: ${GLEW_LIBRARY}")
+message(STATUS "GLFW_LIBRARY: ${GLFW_LIBRARY}")
 
 find_quickjs()
-
-include(FindPkgConfig)
-pkg_search_module(GLFW glfw3)
-
-set(GLFW_LIBRARY "${pkgcfg_lib_GLFW_glfw3}")
-message(STATUS "GLFW_LIBRARY: ${GLFW_LIBRARY}")
 
 #find_package(glfw3 3.1 REQUIRED)
 find_package(OpenGL REQUIRED)
