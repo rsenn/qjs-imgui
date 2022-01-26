@@ -28,16 +28,19 @@ macro(find_glew)
     if(GLEW_LIBRARY)
       get_filename_component(GLEW_LIBRARY_DIR "${GLEW_LIBRARY}" DIRECTORY)
     else(GLEW_LIBRARY)
-      find_path(GLEW_LIBRARY_DIR NAMES ${GLEW_LIB_NAMES} DOC "GLEW library directory")
+      find_path(GLEW_LIBRARY_DIR NAMES ${GLEW_LIB_NAMES}
+                DOC "GLEW library directory")
     endif(GLEW_LIBRARY)
   endif(NOT GLEW_LIBRARY_DIR)
 
   # GLEW include dir
   if(NOT GLEW_INCLUDE_DIR)
     if(GLEW_LIBRARY_DIR)
-      string(REGEX REPLACE "/lib/.*" "/include" GLEW_INCLUDE_DIR "${GLEW_LIBRARY_DIR}")
+      string(REGEX REPLACE "/lib/.*" "/include" GLEW_INCLUDE_DIR
+                           "${GLEW_LIBRARY_DIR}")
     else(GLEW_LIBRARY_DIR)
-      find_path(GLEW_INCLUDE_DIR NAMES ${GLEW_INC_NAMES} DOC "GLEW include directory")
+      find_path(GLEW_INCLUDE_DIR NAMES ${GLEW_INC_NAMES}
+                DOC "GLEW include directory")
     endif(GLEW_LIBRARY_DIR)
   endif(NOT GLEW_INCLUDE_DIR)
 
