@@ -1,7 +1,19 @@
 import * as ImGui from 'imgui';
 import * as glfw from 'glfw';
+import { Console } from 'console';
 
 function main() {
+  globalThis.console = new Console(process.stdout, {
+    inspectOptions: {
+      colors: true,
+      depth: 10,
+      //stringBreakNewline: false,
+      maxArrayLength: Infinity,
+      compact: 1,
+      maxStringLength: 60
+    }
+  });
+
   console.log('ImGui', ImGui);
   //console.log('glfw', Object.keys(glfw).filter(n => typeof glfw[n] == 'function'));
 
