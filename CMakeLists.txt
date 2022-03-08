@@ -25,9 +25,7 @@ find_package(OpenGL REQUIRED)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}/imgui ${CMAKE_CURRENT_BINARY_DIR}/gl3w/include
-  ${QUICKJS_INCLUDE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui ${CMAKE_CURRENT_BINARY_DIR}/gl3w/include ${QUICKJS_INCLUDE_DIR})
 
 link_directories(${QUICKJS_LIBRARY_DIR})
 
@@ -35,17 +33,7 @@ add_subdirectory(gl3w EXCLUDE_FROM_ALL)
 
 set(imgui_LIBRARIES ${GLFW_LIBRARY} ${GLEW_LIBRARY})
 set(imgui_DEPS gl3w)
-make_module(
-  imgui
-  quickjs-imgui.cpp
-  quickjs-imgui.hpp
-  imgui/imgui.cpp
-  imgui/imgui_draw.cpp
-  imgui/imgui_tables.cpp
-  imgui/imgui_widgets.cpp
-  imgui/imgui_demo.cpp
-  imgui/backends/imgui_impl_glfw.cpp
-  imgui/backends/imgui_impl_opengl3.cpp)
+make_module(imgui quickjs-imgui.cpp quickjs-imgui.hpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/imgui_demo.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
 #make_shared_module(imgui quickjs-imgui.cpp quickjs-imgui.hpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/imgui_demo.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
 
 #target_link_libraries(qjs-imgui ${GLFW_LIBRARY} ${QUICKJS_LIBRARY})

@@ -26,19 +26,16 @@ macro(find_glfw)
     if(GLFW_LIBRARY)
       get_filename_component(GLFW_LIBRARY_DIR "${GLFW_LIBRARY}" DIRECTORY)
     else(GLFW_LIBRARY)
-      find_path(GLFW_LIBRARY_DIR NAMES ${GLFW_LIB_NAMES}
-                DOC "GLFW library directory")
+      find_path(GLFW_LIBRARY_DIR NAMES ${GLFW_LIB_NAMES} DOC "GLFW library directory")
     endif(GLFW_LIBRARY)
   endif(NOT GLFW_LIBRARY_DIR)
 
   # GLFW include dir
   if(NOT GLFW_INCLUDE_DIR)
     if(GLFW_LIBRARY_DIR)
-      string(REGEX REPLACE "/lib/?.*" "/include" GLFW_INCLUDE_DIR
-                           "${GLFW_LIBRARY_DIR}")
+      string(REGEX REPLACE "/lib/?.*" "/include" GLFW_INCLUDE_DIR "${GLFW_LIBRARY_DIR}")
     else(GLFW_LIBRARY_DIR)
-      find_path(GLFW_INCLUDE_DIR NAMES ${GLFW_INC_NAMES}
-                DOC "GLFW include directory")
+      find_path(GLFW_INCLUDE_DIR NAMES ${GLFW_INC_NAMES} DOC "GLFW include directory")
     endif(GLFW_LIBRARY_DIR)
   endif(NOT GLFW_INCLUDE_DIR)
 
