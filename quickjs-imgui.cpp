@@ -2359,8 +2359,12 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
 typedef enum { PROPERTY = 0, CALL = 1, INVOKE = 2 } pointer_closure_type;
 
 struct imgui_pointer_closure {
+  int ref_count;
   JSContext* ctx;
-  union { JSValue obj; JSValue fns[2]; };
+  union {
+    JSValue obj;
+    JSValue fns[2];
+  };
   JSAtom prop;
   pointer_closure_type type;
 };
@@ -2368,11 +2372,14 @@ struct imgui_pointer_closure {
 static void
 js_imgui_pointer_finalize(void* opaque) {
   struct imgui_pointer_closure* closure(static_cast<struct imgui_pointer_closure*>(opaque));
-  JSContext* ctx = closure->ctx;
-  JS_FreeValue(ctx, closure->obj);
-  JS_FreeAtom(ctx, closure->prop);
 
-  js_free(ctx, closure);
+  if(--closure->ref_count == 0) {
+    JSContext* ctx = closure->ctx;
+    JS_FreeValue(ctx, closure->obj);
+    JS_FreeAtom(ctx, closure->prop);
+
+    js_free(ctx, closure);
+  }
 }
 
 static JSValue
@@ -2380,13 +2387,12 @@ js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
   struct imgui_pointer_closure* closure(static_cast<struct imgui_pointer_closure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
-  
-    switch(closure->type) {
-      case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, argc, argv); break;
-      case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, argc, argv); break;
-      case PROPERTY: JS_SetProperty(ctx, closure->obj, closure->prop, JS_DupValue(ctx, argv[0])); break;
-    }
-   return ret;
+  switch(closure->type) {
+    case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, argc, argv); break;
+    case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, argc, argv); break;
+    case PROPERTY: JS_SetProperty(ctx, closure->obj, closure->prop, JS_DupValue(ctx, argv[0])); break;
+  }
+  return ret;
 }
 
 static JSValue
@@ -2394,11 +2400,11 @@ js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
   struct imgui_pointer_closure* closure(static_cast<struct imgui_pointer_closure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
-    switch(closure->type) {
-      case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, 0, 0); break;
-      case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, 0, 0); break;
-      case PROPERTY: JS_GetProperty(ctx, closure->obj, closure->prop); break;
-    }
+  switch(closure->type) {
+    case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, 0, 0); break;
+    case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, 0, 0); break;
+    case PROPERTY: ret = JS_GetProperty(ctx, closure->obj, closure->prop); break;
+  }
   return ret;
 }
 
@@ -2407,24 +2413,36 @@ js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueCo
   struct imgui_pointer_closure* closure(static_cast<struct imgui_pointer_closure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
-  return argc == 0 ? js_imgui_pointer_get(ctx,this_val,argc,argv,magic,opaque) : js_imgui_pointer_set(ctx,this_val,argc,argv,magic,opaque);
+  return (argc == 0 || JS_IsUndefined(argv[0])) ? js_imgui_pointer_get(ctx, this_val, argc, argv, magic, opaque) : js_imgui_pointer_set(ctx, this_val, argc, argv, magic, opaque);
 }
 
 static JSValue
-js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[]) {
+js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
   JSValue ret = JS_UNDEFINED;
   struct imgui_pointer_closure* closure;
 
   if(!(closure = static_cast<struct imgui_pointer_closure*>(js_malloc(ctx, sizeof(struct imgui_pointer_closure)))))
     return JS_ThrowOutOfMemory(ctx);
+
   bool is_function = JS_IsFunction(ctx, argv[0]);
 
+  closure->ref_count = 1;
   closure->ctx = ctx;
   closure->obj = JS_DupValue(ctx, argv[0]);
-  closure->type = is_function ? argc >= 2 ? INVOKE : CALL : PROPERTY;
+  closure->type = is_function ? (argc >= 2 && !JS_IsUndefined(argv[1])) ? INVOKE : CALL : PROPERTY;
   closure->prop = JS_ValueToAtom(ctx, argc >= 2 ? argv[1] : JS_UNDEFINED);
 
-  ret = JS_NewCClosure(ctx, js_imgui_pointer_func, 1, 0, closure, js_imgui_pointer_finalize);
+  switch(magic) {
+    case 0: ret = JS_NewCClosure(ctx, js_imgui_pointer_func, 1, 0, closure, js_imgui_pointer_finalize); break;
+    case 1: ret = JS_NewCClosure(ctx, js_imgui_pointer_get, 0, magic, closure, js_imgui_pointer_finalize); break;
+    case 2: ret = JS_NewCClosure(ctx, js_imgui_pointer_set, 1, magic, closure, js_imgui_pointer_finalize); break;
+    case 3:
+      closure->ref_count = 2;
+      ret = JS_NewArray(ctx);
+      JS_SetPropertyUint32(ctx, ret, 0, JS_NewCClosure(ctx, js_imgui_pointer_get, 0, magic, closure, js_imgui_pointer_finalize));
+      JS_SetPropertyUint32(ctx, ret, 1, JS_NewCClosure(ctx, js_imgui_pointer_set, 1, magic, closure, js_imgui_pointer_finalize));
+      break;
+  }
 
   return ret;
 }
@@ -2764,8 +2782,10 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_OBJECT_DEF("MouseButton", js_imgui_mousebutton, countof(js_imgui_mousebutton), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("MouseCursor", js_imgui_mousecursor, countof(js_imgui_mousecursor), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("Cond", js_imgui_cond, countof(js_imgui_cond), JS_PROP_ENUMERABLE),
-    JS_CFUNC_DEF("Pointer", 1, js_imgui_pointer),
-
+    JS_CFUNC_MAGIC_DEF("Pointer", 1, js_imgui_pointer, 0),
+    JS_CFUNC_MAGIC_DEF("PointerGetter", 1, js_imgui_pointer, 1),
+    JS_CFUNC_MAGIC_DEF("PointerSetter", 1, js_imgui_pointer, 2),
+    JS_CFUNC_MAGIC_DEF("PointerGetSet", 1, js_imgui_pointer, 3),
 };
 
 #include "quickjs-imgui-inputtextcallbackdata.hpp"
