@@ -2360,7 +2360,7 @@ typedef enum { PROPERTY = 0, CALL = 1, INVOKE = 2 } pointer_closure_type;
 
 struct imgui_pointer_closure {
   JSContext* ctx;
-  JSValue obj;
+  union { JSValue obj; JSValue fns[2]; };
   JSAtom prop;
   pointer_closure_type type;
 };
@@ -2376,24 +2376,38 @@ js_imgui_pointer_finalize(void* opaque) {
 }
 
 static JSValue
-js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv, int magic, void* opaque) {
+js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv, int magic, void* opaque) {
   struct imgui_pointer_closure* closure(static_cast<struct imgui_pointer_closure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
-  if(argc == 0) {
-    switch(closure->type) {
-      case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, 0, 0); break;
-      case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, 0, 0); break;
-      case PROPERTY: JS_GetProperty(ctx, closure->obj, closure->prop); break;
-    }
-  } else {
+  
     switch(closure->type) {
       case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, argc, argv); break;
       case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, argc, argv); break;
       case PROPERTY: JS_SetProperty(ctx, closure->obj, closure->prop, JS_DupValue(ctx, argv[0])); break;
     }
-  }
+   return ret;
+}
+
+static JSValue
+js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv, int magic, void* opaque) {
+  struct imgui_pointer_closure* closure(static_cast<struct imgui_pointer_closure*>(opaque));
+  JSValue ret = JS_UNDEFINED;
+
+    switch(closure->type) {
+      case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, 0, 0); break;
+      case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, 0, 0); break;
+      case PROPERTY: JS_GetProperty(ctx, closure->obj, closure->prop); break;
+    }
   return ret;
+}
+
+static JSValue
+js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv, int magic, void* opaque) {
+  struct imgui_pointer_closure* closure(static_cast<struct imgui_pointer_closure*>(opaque));
+  JSValue ret = JS_UNDEFINED;
+
+  return argc == 0 ? js_imgui_pointer_get(ctx,this_val,argc,argv,magic,opaque) : js_imgui_pointer_set(ctx,this_val,argc,argv,magic,opaque);
 }
 
 static JSValue
