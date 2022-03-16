@@ -674,10 +674,11 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     case IMGUI_BEGIN: {
       const char* name = JS_ToCString(ctx, argv[0]);
       int32_t window_flags = 0;
+      OutputArg<bool> p_open(ctx, argc >= 2 ? argv[1] : JS_NULL);
       if(argc >= 3)
         JS_ToInt32(ctx, &window_flags, argv[2]);
 
-      ret = JS_NewBool(ctx, ImGui::Begin(name, 0, window_flags));
+      ret = JS_NewBool(ctx, ImGui::Begin(name, p_open, window_flags));
       JS_FreeCString(ctx, name);
       break;
     }
@@ -1440,8 +1441,11 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     case IMGUI_COLLAPSING_HEADER: {
       const char* label = JS_ToCString(ctx, argv[0]);
       int32_t flags = 0;
-      JS_ToInt32(ctx, &flags, argv[1]);
-      ImGui::CollapsingHeader(label, flags);
+      OutputArg<bool> p_visible(ctx, argc >= 2 ? argv[1] : JS_NULL);
+      if(argc >= 3)
+        JS_ToInt32(ctx, &flags, argv[2]);
+
+      ImGui::CollapsingHeader(label, p_visible, flags);
       JS_FreeCString(ctx, label);
       break;
     }
@@ -1454,11 +1458,9 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     }
     case IMGUI_SELECTABLE: {
       const char* label = JS_ToCString(ctx, argv[0]);
-      bool selected = false;
+      OutputArg<bool> selected(ctx, argc >= 2 ? argv[1] : JS_NULL);
       int32_t flags = 0;
       ImVec2 size(0, 0);
-      if(argc >= 2)
-        selected = JS_ToBool(ctx, argv[1]);
       if(argc >= 3)
         JS_ToInt32(ctx, &flags, argv[2]);
       if(argc >= 4)
@@ -1538,14 +1540,10 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     }
     case IMGUI_MENU_ITEM: {
       const char *label = JS_ToCString(ctx, argv[0]), *shortcut = 0;
-      bool selected = false, enabled = true;
+      OutputArg<bool> selected(ctx, argc >= 3 ? argv[2] : JS_NULL);
       if(argc >= 2)
         shortcut = JS_ToCString(ctx, argv[1]);
-      if(argc >= 3)
-        selected = JS_ToBool(ctx, argv[2]);
-      if(argc >= 4)
-        enabled = JS_ToBool(ctx, argv[3]);
-      ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, selected, enabled));
+      ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, selected, argc >= 4 ? JS_ToBool(ctx, argv[3]) : true));
       JS_FreeCString(ctx, label);
       if(shortcut)
         JS_FreeCString(ctx, shortcut);
@@ -1838,7 +1836,16 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       ImGui::EndTabBar();
       break;
     }
-    case IMGUI_BEGIN_TAB_ITEM: break;
+    case IMGUI_BEGIN_TAB_ITEM: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      OutputArg<bool> p_open(ctx, argc >= 2 ? argv[1] : JS_NULL);
+      int32_t flags = 0;
+      if(argc >= 3)
+        JS_ToInt32(ctx, &flags, argv[2]);
+      ret = JS_NewBool(ctx, ImGui::BeginTabItem(label, p_open, flags));
+      JS_FreeCString(ctx, label);
+      break;
+    }
     case IMGUI_END_TAB_ITEM: {
       ImGui::EndTabItem();
       break;
