@@ -88,7 +88,7 @@ public:
   }
 };
 
-template<typename T> class OutputArg   {
+template<typename T> class OutputArg {
 public:
   T value;
   JSRef param;
@@ -96,7 +96,10 @@ public:
 
   OutputArg() : param(JS_NULL), ctx(0) {}
   OutputArg(JSContext* _ctx, JSValueConst _arg) : param(_arg), ctx(_ctx) { value = JSVal<T>::to(ctx, param.get(ctx)); }
-  ~OutputArg() { if(ctx) param.set(ctx, JSVal<T>::from(ctx, value)); }
+  ~OutputArg() {
+    if(ctx)
+      param.set(ctx, JSVal<T>::from(ctx, value));
+  }
 
   operator T*() { return &value; }
 };

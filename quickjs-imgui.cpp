@@ -345,6 +345,8 @@ enum {
   IMGUI_SET_ALLOCATOR_FUNCTIONS,
   IMGUI_MEM_ALLOC,
   IMGUI_MEM_FREE,
+  IMGUI_POINTER,
+
 };
 
 static void
@@ -2354,6 +2356,57 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
   return ret;
 }
 
+struct imgui_pointer_closure {
+  JSContext* ctx;
+  JSValue obj;
+  JSAtom prop;
+  bool call;
+};
+
+static void
+js_imgui_pointer_finalize(void* opaque) {
+  struct imgui_pointer_closure* closure(static_cast<struct imgui_pointer_closure*>(opaque));
+  JSContext* ctx = closure->ctx;
+  JS_FreeValue(ctx, closure->obj);
+  JS_FreeAtom(ctx, closure->prop);
+
+  js_free(ctx, closure);
+}
+
+static JSValue
+js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv, int magic, void* opaque) {
+  struct imgui_pointer_closure* closure(static_cast<struct imgui_pointer_closure*>(opaque));
+  JSValue ret = JS_UNDEFINED;
+
+  if(argc == 0) {
+    ret = closure->call ? JS_Call(ctx, closure->obj, JS_UNDEFINED, 0, 0) : JS_GetProperty(ctx, closure->obj, closure->prop);
+  } else {
+    if(closure->call)
+      ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, argc, argv);
+    else
+      JS_SetProperty(ctx, closure->obj, closure->prop, JS_DupValue(ctx, argv[0]));
+  }
+  return ret;
+}
+
+static JSValue
+js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[]) {
+  JSValue ret = JS_UNDEFINED;
+  struct imgui_pointer_closure* closure;
+
+  if(!(closure = static_cast<struct imgui_pointer_closure*>(js_malloc(ctx, sizeof(struct imgui_pointer_closure)))))
+    return JS_ThrowOutOfMemory(ctx);
+
+  closure->ctx = ctx;
+  closure->obj = JS_DupValue(ctx, argv[0]);
+  closure->prop = argc >= 2 ? JS_ValueToAtom(ctx, argv[1]) : JS_NewAtomUInt32(ctx, 0);
+  closure->call = JS_IsFunction(ctx, argv[0]);
+
+  ret = JS_NewCClosure(ctx, js_imgui_pointer_func, 1, 0, closure, js_imgui_pointer_finalize);
+
+  return ret;
+}
+
 static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_CFUNC_MAGIC_DEF("Init", 1, js_imgui_functions, IMGUI_INIT),
     JS_CFUNC_MAGIC_DEF("CreateContext", 0, js_imgui_functions, IMGUI_CREATE_CONTEXT),
@@ -2689,6 +2742,7 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_OBJECT_DEF("MouseButton", js_imgui_mousebutton, countof(js_imgui_mousebutton), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("MouseCursor", js_imgui_mousecursor, countof(js_imgui_mousecursor), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("Cond", js_imgui_cond, countof(js_imgui_cond), JS_PROP_ENUMERABLE),
+    JS_CFUNC_DEF("Pointer", 1, js_imgui_pointer),
 
 };
 
