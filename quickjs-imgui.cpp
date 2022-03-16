@@ -2356,11 +2356,13 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
   return ret;
 }
 
+typedef enum { PROPERTY = 0, CALL = 1, INVOKE = 2 } pointer_closure_type;
+
 struct imgui_pointer_closure {
   JSContext* ctx;
   JSValue obj;
   JSAtom prop;
-  bool call;
+  pointer_closure_type type;
 };
 
 static void
@@ -2379,12 +2381,17 @@ js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueCo
   JSValue ret = JS_UNDEFINED;
 
   if(argc == 0) {
-    ret = closure->call ? JS_Call(ctx, closure->obj, JS_UNDEFINED, 0, 0) : JS_GetProperty(ctx, closure->obj, closure->prop);
+    switch(closure->type) {
+      case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, 0, 0); break;
+      case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, 0, 0); break;
+      case PROPERTY: JS_GetProperty(ctx, closure->obj, closure->prop); break;
+    }
   } else {
-    if(closure->call)
-      ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, argc, argv);
-    else
-      JS_SetProperty(ctx, closure->obj, closure->prop, JS_DupValue(ctx, argv[0]));
+    switch(closure->type) {
+      case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, argc, argv); break;
+      case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, argc, argv); break;
+      case PROPERTY: JS_SetProperty(ctx, closure->obj, closure->prop, JS_DupValue(ctx, argv[0])); break;
+    }
   }
   return ret;
 }
@@ -2396,11 +2403,12 @@ js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst a
 
   if(!(closure = static_cast<struct imgui_pointer_closure*>(js_malloc(ctx, sizeof(struct imgui_pointer_closure)))))
     return JS_ThrowOutOfMemory(ctx);
+  bool is_function = JS_IsFunction(ctx, argv[0]);
 
   closure->ctx = ctx;
   closure->obj = JS_DupValue(ctx, argv[0]);
-  closure->prop = argc >= 2 ? JS_ValueToAtom(ctx, argv[1]) : JS_NewAtomUInt32(ctx, 0);
-  closure->call = JS_IsFunction(ctx, argv[0]);
+  closure->type = is_function ? argc >= 2 ? INVOKE : CALL : PROPERTY;
+  closure->prop = JS_ValueToAtom(ctx, argc >= 2 ? argv[1] : JS_UNDEFINED);
 
   ret = JS_NewCClosure(ctx, js_imgui_pointer_func, 1, 0, closure, js_imgui_pointer_finalize);
 

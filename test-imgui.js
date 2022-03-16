@@ -100,6 +100,12 @@ function main() {
     ImGui.Button('Button');
     let show_app_main_menu_bar, show_app_console, show_app_log, show_app_layout, show_app_property_editor, show_app_long_text, show_app_auto_resize, show_app_constrained_resize, show_app_simple_overlay, show_app_fullscreen, show_app_window_titles, show_app_custom_rendering, show_app_documents, show_app_metrics, show_app_style_editor, show_app_about;
 
+let ptr = ImGui.Pointer(v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v)));
+
+console.log('ptr(123)',ptr(123));
+console.log('ptr()',ptr());
+console.log('show_app_main_menu_bar',show_app_main_menu_bar);
+
     // Menu Bar
     if(ImGui.BeginMenuBar()) {
       if(ImGui.BeginMenu('Menu')) {
