@@ -2356,7 +2356,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
   return ret;
 }
 
-typedef enum { PROPERTY = 0, CALL = 1, INVOKE = 2 } pointer_closure_type;
+typedef enum { PROPERTY = 0, CALL = 1, INVOKE = 2, GETSET = 3 } pointer_closure_type;
 
 struct imgui_pointer_closure {
   int ref_count;
@@ -2377,6 +2377,7 @@ js_imgui_pointer_finalize(void* opaque) {
     JSContext* ctx = closure->ctx;
     JS_FreeValue(ctx, closure->obj);
     JS_FreeAtom(ctx, closure->prop);
+    JS_FreeValue(ctx, closure->fns[1]);
 
     js_free(ctx, closure);
   }
@@ -2391,6 +2392,7 @@ js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
     case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, argc, argv); break;
     case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, argc, argv); break;
     case PROPERTY: JS_SetProperty(ctx, closure->obj, closure->prop, JS_DupValue(ctx, argv[0])); break;
+    case GETSET: ret = JS_Call(ctx, closure->fns[1], JS_UNDEFINED, argc, argv); break;
   }
   return ret;
 }
@@ -2404,6 +2406,7 @@ js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
     case CALL: ret = JS_Call(ctx, closure->obj, JS_UNDEFINED, 0, 0); break;
     case INVOKE: ret = JS_Invoke(ctx, closure->obj, closure->prop, 0, 0); break;
     case PROPERTY: ret = JS_GetProperty(ctx, closure->obj, closure->prop); break;
+    case GETSET: ret = JS_Call(ctx, closure->fns[0], JS_UNDEFINED, 0, 0); break;
   }
   return ret;
 }
@@ -2429,8 +2432,9 @@ js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst a
   closure->ref_count = 1;
   closure->ctx = ctx;
   closure->obj = JS_DupValue(ctx, argv[0]);
-  closure->type = is_function ? (argc >= 2 && !JS_IsUndefined(argv[1])) ? INVOKE : CALL : PROPERTY;
+  closure->type = is_function ? (argc >= 2 && !JS_IsUndefined(argv[1])) ? JS_IsFunction(ctx, argv[1]) ? GETSET : INVOKE : CALL : PROPERTY;
   closure->prop = JS_ValueToAtom(ctx, argc >= 2 ? argv[1] : JS_UNDEFINED);
+  closure->fns[1] = closure->type == GETSET ? JS_DupValue(ctx, argv[1]) : JS_UNDEFINED;
 
   switch(magic) {
     case 0: ret = JS_NewCClosure(ctx, js_imgui_pointer_func, 1, 0, closure, js_imgui_pointer_finalize); break;
