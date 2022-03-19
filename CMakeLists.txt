@@ -35,7 +35,6 @@ if(NOT TARGET gl3w_gen)
   add_subdirectory(gl3w EXCLUDE_FROM_ALL)
 endif(NOT TARGET gl3w_gen)
 
-
 set(imgui_LIBRARIES ${GLFW_LIBRARY} ${GLEW_LIBRARY} ${OPENGL_gl_LIBRARY})
 #set(imgui_DEPS gl3w)
 
