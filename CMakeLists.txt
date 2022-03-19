@@ -1,5 +1,7 @@
 project(qjs-imgui C CXX)
 
+message("Building project [1;31m${PROJECT_NAME}[0m")
+
 cmake_minimum_required(VERSION 3.2)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/UseMultiArch.cmake)
@@ -29,12 +31,15 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui ${CMAKE_CURRENT_BINARY_DIR
 
 link_directories(${QUICKJS_LIBRARY_DIR})
 
-add_subdirectory(gl3w EXCLUDE_FROM_ALL)
+if(NOT TARGET gl3w_gen)
+  add_subdirectory(gl3w EXCLUDE_FROM_ALL)
+endif(NOT TARGET gl3w_gen)
 
-set(imgui_LIBRARIES ${GLFW_LIBRARY} ${GLEW_LIBRARY})
-set(imgui_DEPS gl3w)
 
-set(IMGUI_SOURCES  imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/imgui_demo.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
+set(imgui_LIBRARIES ${GLFW_LIBRARY} ${GLEW_LIBRARY} ${OPENGL_gl_LIBRARY})
+#set(imgui_DEPS gl3w)
+
+set(IMGUI_SOURCES imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/imgui_demo.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends)
 
