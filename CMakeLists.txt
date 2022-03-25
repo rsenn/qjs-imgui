@@ -2,6 +2,8 @@ project(qjs-imgui C CXX)
 
 message("Building project [1;31m${PROJECT_NAME}[0m")
 
+option(USE_GL3W OFF "Use GL3W instead of GLEW")
+
 cmake_minimum_required(VERSION 3.2)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/UseMultiArch.cmake)
@@ -11,9 +13,19 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindQuickJS.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/QuickJSModule.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLEW.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLFW.cmake)
+if(USE_GL3W)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildGL3W.cmake)
+endif(USE_GL3W)
 
 find_glew()
 find_glfw()
+
+if(USE_GL3W)
+  build_gl3w()
+
+  add_definitions(-DUSE_GL3W)
+endif(USE_GL3W)
+
 
 #message(STATUS "GLEW_LIBRARY: ${GLEW_LIBRARY}")
 #message(STATUS "GLFW_LIBRARY: ${GLFW_LIBRARY}")
@@ -31,9 +43,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui ${CMAKE_CURRENT_BINARY_DIR
 
 link_directories(${QUICKJS_LIBRARY_DIR})
 
-if(NOT TARGET gl3w_gen)
-  add_subdirectory(gl3w EXCLUDE_FROM_ALL)
-endif(NOT TARGET gl3w_gen)
+if(USE_GL3W)
+  if(NOT TARGET gl3w_gen)
+    add_subdirectory(gl3w EXCLUDE_FROM_ALL)
+  endif(NOT TARGET gl3w_gen)
+endif(USE_GL3W)
 
 set(imgui_LIBRARIES ${GLFW_LIBRARY} ${GLEW_LIBRARY} ${OPENGL_gl_LIBRARY})
 #set(imgui_DEPS gl3w)
