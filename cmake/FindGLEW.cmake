@@ -11,7 +11,8 @@ macro(find_glew)
   endif(UNIX)
 
   # GLEW static library
-  find_library(GLEW_LIBRARY NAMES ${GLEW_LIB_NAMES} DOC "GLEW library" CMAKE_FIND_ROOT_PATH_BOTH)
+  find_library(GLEW_LIBRARY NAMES ${GLEW_LIB_NAMES} DOC "GLEW library"
+               CMAKE_FIND_ROOT_PATH_BOTH)
 
   if(NOT GLEW_LIBRARY)
     if(NOT PKG_CONFIG_FOUND)
@@ -29,16 +30,19 @@ macro(find_glew)
     if(GLEW_LIBRARY)
       get_filename_component(GLEW_LIBRARY_DIR "${GLEW_LIBRARY}" DIRECTORY)
     else(GLEW_LIBRARY)
-      find_path(GLEW_LIBRARY_DIR NAMES ${GLEW_LIB_NAMES} DOC "GLEW library directory")
+      find_path(GLEW_LIBRARY_DIR NAMES ${GLEW_LIB_NAMES}
+                DOC "GLEW library directory")
     endif(GLEW_LIBRARY)
   endif(NOT GLEW_LIBRARY_DIR)
 
   # GLEW include dir
   if(NOT GLEW_INCLUDE_DIR)
     if(GLEW_LIBRARY_DIR)
-      string(REGEX REPLACE "/lib/?.*" "/include" GLEW_INCLUDE_DIR "${GLEW_LIBRARY_DIR}")
+      string(REGEX REPLACE "/lib/?.*" "/include" GLEW_INCLUDE_DIR
+                           "${GLEW_LIBRARY_DIR}")
     else(GLEW_LIBRARY_DIR)
-      find_path(GLEW_INCLUDE_DIR NAMES ${GLEW_INC_NAMES} DOC "GLEW include directory")
+      find_path(GLEW_INCLUDE_DIR NAMES ${GLEW_INC_NAMES}
+                DOC "GLEW include directory")
     endif(GLEW_LIBRARY_DIR)
   endif(NOT GLEW_INCLUDE_DIR)
 
@@ -46,8 +50,10 @@ macro(find_glew)
   set(GLEW_VERSION 1.13.0)
 
   set(GLEW_LIBRARY "${GLEW_LIBRARY}" CACHE FILEPATH "GLEW library")
-  set(GLEW_LIBRARY_DIR "${GLEW_LIBRARY_DIR}" CACHE FILEPATH "GLEW library directory")
-  set(GLEW_INCLUDE_DIR "${GLEW_INCLUDE_DIR}" CACHE FILEPATH "GLEW include directory")
+  set(GLEW_LIBRARY_DIR "${GLEW_LIBRARY_DIR}" CACHE FILEPATH
+                                                   "GLEW library directory")
+  set(GLEW_INCLUDE_DIR "${GLEW_INCLUDE_DIR}" CACHE FILEPATH
+                                                   "GLEW include directory")
 
   if(NOT GLEW_CONFIGURATION_SHOWN)
     message(STATUS "GLEW library: ${GLEW_LIBRARY}")
