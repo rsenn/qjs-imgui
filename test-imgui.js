@@ -98,10 +98,28 @@ function main() {
 
     ImGui.Text('This is some useful text.');
     ImGui.Button('Button');
-    let show_app_main_menu_bar, show_app_console, show_app_log, show_app_layout, show_app_property_editor, show_app_long_text, show_app_auto_resize, show_app_constrained_resize, show_app_simple_overlay, show_app_fullscreen, show_app_window_titles, show_app_custom_rendering, show_app_documents, show_app_metrics, show_app_style_editor, show_app_about;
-   // let show = {};
+    let show_app_main_menu_bar,
+      show_app_console,
+      show_app_log,
+      show_app_layout,
+      show_app_property_editor,
+      show_app_long_text,
+      show_app_auto_resize,
+      show_app_constrained_resize,
+      show_app_simple_overlay,
+      show_app_fullscreen,
+      show_app_window_titles,
+      show_app_custom_rendering,
+      show_app_documents,
+      show_app_metrics,
+      show_app_style_editor,
+      show_app_about;
+    // let show = {};
 
-    let ptr = ImGui.Pointer(() => show_app_main_menu_bar, v => show_app_main_menu_bar=v);
+    let ptr = ImGui.Pointer(
+      () => show_app_main_menu_bar,
+      v => (show_app_main_menu_bar = v)
+    );
 
     console.log('ptr()', ptr());
     console.log((ptr(true), 'ptr(true)'));
@@ -117,25 +135,45 @@ function main() {
         ImGui.EndMenu();
       }
       if(ImGui.BeginMenu('Examples')) {
-        ImGui.MenuItem('Main menu bar', null, v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v)));
+        ImGui.MenuItem('Main menu bar', null, v =>
+          v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v)
+        );
         ImGui.MenuItem('Console', null, v => (v === undefined ? show_app_console : (show_app_console = v)));
         ImGui.MenuItem('Log', null, v => (v === undefined ? show_app_log : (show_app_log = v)));
         ImGui.MenuItem('Simple layout', null, v => (v === undefined ? show_app_layout : (show_app_layout = v)));
-        ImGui.MenuItem('Property editor', null, v => (v === undefined ? show_app_property_editor : (show_app_property_editor = v)));
-        ImGui.MenuItem('Long text display', null, v => (v === undefined ? show_app_long_text : (show_app_long_text = v)));
-        ImGui.MenuItem('Auto-resizing window', null, v => (v === undefined ? show_app_auto_resize : (show_app_auto_resize = v)));
-        ImGui.MenuItem('Constrained-resizing window', null, v => (v === undefined ? show_app_constrained_resize : (show_app_constrained_resize = v)));
-        ImGui.MenuItem('Simple overlay', null, v => (v === undefined ? show_app_simple_overlay : (show_app_simple_overlay = v)));
-        ImGui.MenuItem('Fullscreen window', null, v => (v === undefined ? show_app_fullscreen : (show_app_fullscreen = v)));
-        ImGui.MenuItem('Manipulating window titles', null, v => (v === undefined ? show_app_window_titles : (show_app_window_titles = v)));
-        ImGui.MenuItem('Custom rendering', null, v => (v === undefined ? show_app_custom_rendering : (show_app_custom_rendering = v)));
+        ImGui.MenuItem('Property editor', null, v =>
+          v === undefined ? show_app_property_editor : (show_app_property_editor = v)
+        );
+        ImGui.MenuItem('Long text display', null, v =>
+          v === undefined ? show_app_long_text : (show_app_long_text = v)
+        );
+        ImGui.MenuItem('Auto-resizing window', null, v =>
+          v === undefined ? show_app_auto_resize : (show_app_auto_resize = v)
+        );
+        ImGui.MenuItem('Constrained-resizing window', null, v =>
+          v === undefined ? show_app_constrained_resize : (show_app_constrained_resize = v)
+        );
+        ImGui.MenuItem('Simple overlay', null, v =>
+          v === undefined ? show_app_simple_overlay : (show_app_simple_overlay = v)
+        );
+        ImGui.MenuItem('Fullscreen window', null, v =>
+          v === undefined ? show_app_fullscreen : (show_app_fullscreen = v)
+        );
+        ImGui.MenuItem('Manipulating window titles', null, v =>
+          v === undefined ? show_app_window_titles : (show_app_window_titles = v)
+        );
+        ImGui.MenuItem('Custom rendering', null, v =>
+          v === undefined ? show_app_custom_rendering : (show_app_custom_rendering = v)
+        );
         ImGui.MenuItem('Documents', null, v => (v === undefined ? show_app_documents : (show_app_documents = v)));
         ImGui.EndMenu();
       }
       //if (ImGui.MenuItem("MenuItem")) {} // You can also use MenuItem() inside a menu bar!
       if(ImGui.BeginMenu('Tools')) {
         ImGui.MenuItem('Metrics/Debugger', null, v => (v === undefined ? show_app_metrics : (show_app_metrics = v)));
-        ImGui.MenuItem('Style Editor', null, v => (v === undefined ? show_app_style_editor : (show_app_style_editor = v)));
+        ImGui.MenuItem('Style Editor', null, v =>
+          v === undefined ? show_app_style_editor : (show_app_style_editor = v)
+        );
         ImGui.MenuItem('About Dear ImGui', null, v => (v === undefined ? show_app_about : (show_app_about = v)));
         ImGui.EndMenu();
       }
