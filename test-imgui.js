@@ -142,7 +142,7 @@ let slider_value = ImGui.Pointer(0);
 let text_buf = new ArrayBuffer(4096);
 let text_buf2 = new ArrayBuffer(4096 * 16);
 let slider2_value = [0, 0];
-let float_value =  ImGui.Pointer(0.0);
+let float_value = ImGui.Pointer(0.0);
 
 function main() {
   window = new glfw.Window(800, 600, 'ImGui test');
@@ -179,17 +179,32 @@ function main() {
     ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
     ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
 
-    ImGui.InputTextMultiline(
-      'Text',
-      text_buf2,
-      text_buf2.byteLength,
-      [100, 30],
-      ImGui.InputTextFlags.CallbackAlways,
-      data => console.log('InputTextMultiline event', data)
-    );
-    ImGui.InputFloat('Float', float_value, 1, 10,  null,ImGui.InputTextFlags.CallbackAlways, data =>
-      console.log('InputFloat event', data)
-    );
+    let s8_v = new Int8Array(1).buffer;
+    let u8_v =  new Uint8Array(1).buffer;
+    let s16_v = new Int16Array(1).buffer;
+    let u16_v =  new Uint16Array(1).buffer;
+    let s32_v = new Int32Array(1).buffer;
+    let u32_v =  new Uint32Array(1).buffer;
+    let s64_v = new BigInt64Array(1).buffer;
+    let u64_v =  new BigUint64Array(1).buffer;
+  let f32_v = new Float32Array(1).buffer;
+    let f64_v =  new Float64Array(1).buffer;
+    
+    ImGui.InputScalar('input s8', ImGui.DataType.S8, s8_v, null, null, '%d');
+    ImGui.InputScalar('input u8', ImGui.DataType.U8, u8_v, null, null, '%u');
+    ImGui.InputScalar('input s16', ImGui.DataType.S16, s16_v, null, null, '%d');
+    ImGui.InputScalar('input u16', ImGui.DataType.U16, u16_v, null, null, '%u');
+    ImGui.InputScalar('input s32', ImGui.DataType.S32, s32_v, null, null, '%d');
+    ImGui.InputScalar('input s32 hex', ImGui.DataType.S32, s32_v, null, null, '%08X', ImGui.InputTextFlags.CharsHexadecimal);
+    ImGui.InputScalar('input u32', ImGui.DataType.U32, u32_v, null, null, '%u');
+    ImGui.InputScalar('input u32 hex', ImGui.DataType.U32, u32_v, null, null, '%08X', ImGui.InputTextFlags.CharsHexadecimal);
+    ImGui.InputScalar('input s64', ImGui.DataType.S64, s64_v, null);
+    ImGui.InputScalar('input u64', ImGui.DataType.U64, u64_v, null);
+    ImGui.InputScalar('input float', ImGui.DataType.Float, f32_v, null);
+    ImGui.InputScalar('input double', ImGui.DataType.Double, f64_v, null);
+
+    ImGui.InputTextMultiline('Text', text_buf2, text_buf2.byteLength, [100, 30], ImGui.InputTextFlags.CallbackAlways, data => console.log('InputTextMultiline event', data));
+    ImGui.InputFloat('Float', float_value, 1, 10, null, ImGui.InputTextFlags.CallbackAlways, data => console.log('InputFloat event', data));
     false &&
       ImGui.InputText('Text', text_buf, text_buf.byteLength, ImGui.InputTextFlags.CallbackAlways, data => {
         /* prettier-ignore */ const {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection } = data;
@@ -211,11 +226,7 @@ function main() {
         ImGui.EndMenu();
       }
       if(ImGui.BeginMenu('Examples')) {
-        ImGui.MenuItem(
-          'Main menu bar',
-          null,
-          ptr ?? (v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v)))
-        );
+        ImGui.MenuItem('Main menu bar', null, ptr ?? (v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v))));
 
         //console.log('show_app_main_menu_bar', show_app_main_menu_bar);
 
@@ -223,39 +234,21 @@ function main() {
         ImGui.MenuItem('Console', null, v => (v === undefined ? show_app_console : (show_app_console = v)));
         ImGui.MenuItem('Log', null, v => (v === undefined ? show_app_log : (show_app_log = v)));
         ImGui.MenuItem('Simple layout', null, v => (v === undefined ? show_app_layout : (show_app_layout = v)));
-        ImGui.MenuItem('Property editor', null, v =>
-          v === undefined ? show_app_property_editor : (show_app_property_editor = v)
-        );
-        ImGui.MenuItem('Long text display', null, v =>
-          v === undefined ? show_app_long_text : (show_app_long_text = v)
-        );
-        ImGui.MenuItem('Auto-resizing window', null, v =>
-          v === undefined ? show_app_auto_resize : (show_app_auto_resize = v)
-        );
-        ImGui.MenuItem('Constrained-resizing window', null, v =>
-          v === undefined ? show_app_constrained_resize : (show_app_constrained_resize = v)
-        );
-        ImGui.MenuItem('Simple overlay', null, v =>
-          v === undefined ? show_app_simple_overlay : (show_app_simple_overlay = v)
-        );
-        ImGui.MenuItem('Fullscreen window', null, v =>
-          v === undefined ? show_app_fullscreen : (show_app_fullscreen = v)
-        );
-        ImGui.MenuItem('Manipulating window titles', null, v =>
-          v === undefined ? show_app_window_titles : (show_app_window_titles = v)
-        );
-        ImGui.MenuItem('Custom rendering', null, v =>
-          v === undefined ? show_app_custom_rendering : (show_app_custom_rendering = v)
-        );
+        ImGui.MenuItem('Property editor', null, v => (v === undefined ? show_app_property_editor : (show_app_property_editor = v)));
+        ImGui.MenuItem('Long text display', null, v => (v === undefined ? show_app_long_text : (show_app_long_text = v)));
+        ImGui.MenuItem('Auto-resizing window', null, v => (v === undefined ? show_app_auto_resize : (show_app_auto_resize = v)));
+        ImGui.MenuItem('Constrained-resizing window', null, v => (v === undefined ? show_app_constrained_resize : (show_app_constrained_resize = v)));
+        ImGui.MenuItem('Simple overlay', null, v => (v === undefined ? show_app_simple_overlay : (show_app_simple_overlay = v)));
+        ImGui.MenuItem('Fullscreen window', null, v => (v === undefined ? show_app_fullscreen : (show_app_fullscreen = v)));
+        ImGui.MenuItem('Manipulating window titles', null, v => (v === undefined ? show_app_window_titles : (show_app_window_titles = v)));
+        ImGui.MenuItem('Custom rendering', null, v => (v === undefined ? show_app_custom_rendering : (show_app_custom_rendering = v)));
         ImGui.MenuItem('Documents', null, v => (v === undefined ? show_app_documents : (show_app_documents = v)));
         ImGui.EndMenu();
       }
       //if (ImGui.MenuItem("MenuItem")) {} // You can also use MenuItem() inside a menu bar!
       if(ImGui.BeginMenu('Tools')) {
         ImGui.MenuItem('Metrics/Debugger', null, v => (v === undefined ? show_app_metrics : (show_app_metrics = v)));
-        ImGui.MenuItem('Style Editor', null, v =>
-          v === undefined ? show_app_style_editor : (show_app_style_editor = v)
-        );
+        ImGui.MenuItem('Style Editor', null, v => (v === undefined ? show_app_style_editor : (show_app_style_editor = v)));
         ImGui.MenuItem('About Dear ImGui', null, v => (v === undefined ? show_app_about : (show_app_about = v)));
         ImGui.EndMenu();
       }
