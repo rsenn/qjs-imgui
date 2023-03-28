@@ -51,7 +51,7 @@ js_imgui_pointer_finalizer(JSRuntime* rt, JSValue val) {
 }
 
 static JSValue
-js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic, void* opaque) {
+js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[],void* opaque) {
   ImGuiPointerClosure* ptr(static_cast<ImGuiPointerClosure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
@@ -67,7 +67,7 @@ js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
 }
 
 static JSValue
-js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic, void* opaque) {
+js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[],  void* opaque) {
   ImGuiPointerClosure* ptr(static_cast<ImGuiPointerClosure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
@@ -83,14 +83,14 @@ js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
 }
 
 static JSValue
-js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic, void* opaque) {
+js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], void* opaque) {
   ImGuiPointerClosure* ptr(static_cast<ImGuiPointerClosure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
   if((argc == 0 || JS_IsUndefined(argv[0])))
-    return js_imgui_pointer_get(ctx, this_val, argc, argv, magic, opaque);
+    return js_imgui_pointer_get(ctx, this_val, argc, argv,  opaque);
 
-  return js_imgui_pointer_set(ctx, this_val, argc, argv, magic, opaque);
+  return js_imgui_pointer_set(ctx, this_val, argc, argv,  opaque);
 }
 
 static inline ImGuiPointerClosure*
@@ -154,9 +154,9 @@ js_imgui_pointer_call(JSContext* ctx, JSValueConst func_obj, JSValueConst this_v
     return JS_EXCEPTION;
 
   switch(ptr->magic) {
-    case POINTER_CALL: ret = js_imgui_pointer_func(ctx, this_val, argc, argv, ptr->magic, ptr); break;
-    case POINTER_GET: ret = js_imgui_pointer_get(ctx, this_val, argc, argv, ptr->magic, ptr); break;
-    case POINTER_SET: ret = js_imgui_pointer_set(ctx, this_val, argc, argv, ptr->magic, ptr); break;
+    case POINTER_CALL: ret = js_imgui_pointer_func(ctx, this_val, argc, argv, ptr); break;
+    case POINTER_GET: ret = js_imgui_pointer_get(ctx, this_val, argc, argv,  ptr); break;
+    case POINTER_SET: ret = js_imgui_pointer_set(ctx, this_val, argc, argv, ptr); break;
     default: ret = JS_ThrowInternalError(ctx, "%s: invalid magic %d", __func__, ptr->magic); break;
   }
 
