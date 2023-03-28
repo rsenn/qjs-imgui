@@ -300,15 +300,15 @@ template<> void set_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion& data, 
 template<> void set_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_Double>::value_type value) { data.f64 = value; }
 template<enum ImGuiDataType_ type> typename ScalarType<type>::value_type get_scalar(union ImGuiDataTypeUnion const& data);
 template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_S8>(union ImGuiDataTypeUnion const& data) { return data.s8; }
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion const& data) { return data.u8; }
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion const& data) { return data.s16; }
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion const& data) { return data.u16; }
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion const& data) { return data.s32; }
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion const& data) { return data.u32; }
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion const& data) { return data.s64; }
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion const& data) { return data.u64; }
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion const& data) { return data.f32; }
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion const& data) { return data.f64; }
+template<> ScalarType<ImGuiDataType_U8>::value_type get_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion const& data) { return data.u8; }
+template<> ScalarType<ImGuiDataType_S16>::value_type get_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion const& data) { return data.s16; }
+template<> ScalarType<ImGuiDataType_U16>::value_type get_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion const& data) { return data.u16; }
+template<> ScalarType<ImGuiDataType_S32>::value_type get_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion const& data) { return data.s32; }
+template<> ScalarType<ImGuiDataType_U32>::value_type get_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion const& data) { return data.u32; }
+template<> ScalarType<ImGuiDataType_S64>::value_type get_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion const& data) { return data.s64; }
+template<> ScalarType<ImGuiDataType_U64>::value_type get_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion const& data) { return data.u64; }
+template<> ScalarType<ImGuiDataType_Float>::value_type get_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion const& data) { return data.f32; }
+template<> ScalarType<ImGuiDataType_Double>::value_type get_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion const& data) { return data.f64; }
 
 
 // typedef std::variant<int64_t, uint64_t, float, double> ImGuiDataTypeVariant;
