@@ -20,7 +20,9 @@ enum ImGuiPointerType {
 };
 
 struct ImGuiPointerClosure {
-  int magic;
+  int ref_count,magic;
+  JSAtom prop;
+  ImGuiPointerType type;
   union {
     JSValue obj;
     struct {
@@ -32,8 +34,6 @@ struct ImGuiPointerClosure {
       JSValue set;
     };
   };
-  JSAtom prop;
-  ImGuiPointerType type;
 };
 
 static void
@@ -94,7 +94,7 @@ js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueCo
 }
 
 static JSValue
-js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
+js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int  magic) {
   JSValue ret = JS_UNDEFINED;
 
   switch(magic) {
