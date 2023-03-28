@@ -122,11 +122,14 @@ function main() {
     );
 
     let ptr2 = ImGui.Pointer(false);
+    let show_demo_window = ImGui.Pointer(false);
 
     /*console.log('ptr2()', ptr2());
     console.log((ptr2(true), 'ptr2(true)'));
     console.log('ptr2()', ptr2());
     console.log((ptr2(false), 'ptr2(false)'));*/
+
+    ImGui.ShowDemoWindow(show_demo_window);
 
     // Menu Bar
     if(ImGui.BeginMenuBar()) {
@@ -143,6 +146,7 @@ function main() {
 
         //console.log('show_app_main_menu_bar', show_app_main_menu_bar);
 
+        ImGui.MenuItem('Show Demo Window', null, show_demo_window);
         ImGui.MenuItem('Console', null, v => (v === undefined ? show_app_console : (show_app_console = v)));
         ImGui.MenuItem('Log', null, v => (v === undefined ? show_app_log : (show_app_log = v)));
         ImGui.MenuItem('Simple layout', null, v => (v === undefined ? show_app_layout : (show_app_layout = v)));
