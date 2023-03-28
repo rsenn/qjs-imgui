@@ -41,11 +41,14 @@ js_imgui_pointer_finalizer(JSRuntime* rt, JSValue val) {
   ImGuiPointerClosure* ptr;
 
   if((ptr = static_cast<ImGuiPointerClosure*>(JS_GetOpaque(val, js_imgui_pointer_class_id)))) {
-    JS_FreeAtomRT(rt, ptr->prop);
-    JS_FreeValueRT(rt, ptr->obj);
-    JS_FreeValueRT(rt, ptr->set);
 
-    js_free_rt(rt, ptr);
+    if(--ptr->ref_count == 0) {
+      JS_FreeAtomRT(rt, ptr->prop);
+      JS_FreeValueRT(rt, ptr->obj);
+      JS_FreeValueRT(rt, ptr->set);
+
+      js_free_rt(rt, ptr);
+    }
   }
   JS_FreeValueRT(rt, val);
 }
