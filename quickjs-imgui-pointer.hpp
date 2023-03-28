@@ -131,7 +131,6 @@ js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst a
       ret = JS_NewObjectProtoClass(ctx, imgui_pointer_proto, js_imgui_pointer_class_id);
 
       JS_SetOpaque(ret, ptr);
-
       break;
     }
   }
