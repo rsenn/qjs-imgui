@@ -1544,15 +1544,27 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       break;
     }
     case IMGUI_MENU_ITEM: {
-      const char *label = JS_ToCString(ctx, argv[0]), *shortcut = nullptr;
-      OutputArg<bool> selected(ctx, argc >= 3 ? argv[2] : JS_NULL);
+      const char *label = nullptr, *shortcut = nullptr;
+      BOOL enabled = TRUE;
 
-      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+      if(argc > 0 && !(JS_IsNull(argv[0]) || JS_IsUndefined(argv[0])))
+        label = JS_ToCString(ctx, argv[0]);
+      if(argc > 1 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
         shortcut = JS_ToCString(ctx, argv[1]);
+      if(argc > 3)
+        enabled = JS_ToBool(ctx, argv[3]);
 
-      ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, selected, argc >= 4 ? JS_ToBool(ctx, argv[3]) : true));
+      if(argc < 3 || JS_IsBool(argv[2])) {
+        BOOL selected = argc > 2 && JS_IsBool(argv[2]) ? JS_ToBool(ctx, argv[2]) : FALSE;
 
-      JS_FreeCString(ctx, label);
+        ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, selected, enabled));
+      } else {
+        OutputArg<bool> p_selected(ctx, argc > 2 ? argv[2] : JS_NULL);
+
+        ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, static_cast<bool*>(p_selected), enabled));
+      }
+      if(label)
+        JS_FreeCString(ctx, label);
       if(shortcut)
         JS_FreeCString(ctx, shortcut);
       break;

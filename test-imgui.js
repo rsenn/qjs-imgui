@@ -1,6 +1,8 @@
 import * as ImGui from 'imgui';
 import * as glfw from 'glfw';
 
+Object.assign(globalThis, { ImGui, glfw });
+
 let window;
 
 let menuEnabled,
@@ -55,7 +57,12 @@ function ShowExampleMenuFile() {
     for(let i = 0; i < ImGui.Col.COUNT; i++) {
       let name = ImGui.GetStyleColorName(i);
       let p = ImGui.GetCursorScreenPos();
-      ImGui.GetWindowDrawList().AddRectFilled(p, [p.x + sz, p.y + sz], ImGui.GetColorU32(i));
+
+      let dl = ImGui.GetWindowDrawList();
+
+      console.log('GetWindowDrawList() =', dl);
+      if(dl) dl.AddRectFilled(p, [p.x + sz, p.y + sz], ImGui.GetColorU32(i));
+
       ImGui.Dummy([sz, sz]);
       ImGui.SameLine();
       ImGui.MenuItem(name);
