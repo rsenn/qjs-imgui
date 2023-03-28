@@ -56,7 +56,7 @@ js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
   JSValue ret = JS_UNDEFINED;
 
   switch(ptr->type) {
-    case CALL: ret = JS_Call(ctx, ptr->obj, JS_UNDEFINED, argc, argv); break;
+    case CALL: ret = JS_Call(ctx, ptr->funcObj, ptr->thisObj, argc, argv); break;
     case INVOKE: ret = JS_Invoke(ctx, ptr->obj, ptr->prop, argc, argv); break;
     case PROPERTY: JS_SetProperty(ctx, ptr->obj, ptr->prop, JS_DupValue(ctx, argv[0])); break;
     case GETSET: ret = JS_Call(ctx, ptr->set, JS_UNDEFINED, argc, argv); break;
