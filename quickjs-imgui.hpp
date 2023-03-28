@@ -154,8 +154,8 @@ template<typename T, size_t N> struct JSVal<std::array<T, N>> {
   to(JSContext* ctx, JSValueConst jsval) {
     std::array<T, N> ret;
     for(size_t i = 0; i < N; ++i) {
-      JSValue prop = JS_GetPropertyUint32(ctx, ret, i);
-      ret[i] = JSVal<T>::to(ctx, jsval);
+      JSValue prop = JS_GetPropertyUint32(ctx, jsval, i);
+      ret[i] = JSVal<T>::to(ctx, prop);
       JS_FreeValue(ctx, prop);
     }
     return ret;
@@ -166,6 +166,11 @@ template<typename T, size_t N> struct JSVal<std::array<T, N>> {
     JSValue ret = JS_NewArray(ctx);
     for(size_t i = 0; i < N; ++i) JS_SetPropertyUint32(ctx, ret, i, JSVal<T>::from(ctx, v[i]));
     return ret;
+  }
+
+  static void
+  from(JSContext* ctx, std::array<float, N> v, JSValueConst arr) {
+    for(size_t i = 0; i < N; ++i) JS_SetPropertyUint32(ctx, arr, i, JSVal<T>::from(ctx, v[i]));
   }
 };
 
@@ -219,8 +224,8 @@ public:
     if(!is_null) {
       JSValue tmp = JSVal<T>::from(ctx, value);
 
-      if(value != initially)
-        std::cerr << "value (" << value << ") != initially (" << initially << ")" << std::endl;
+      /*if(value != initially)
+        std::cerr << "value (" << value << ") != initially (" << initially << ")" << std::endl;*/
 
       param.set(ctx, tmp);
       JS_FreeValue(ctx, tmp);
@@ -228,6 +233,31 @@ public:
   }
 
   operator T*() { return is_null ? nullptr : &value; }
+};
+
+template<typename T, size_t N> class OutputArg< std::array<T, N> > {
+public:
+  bool is_null;
+  std::array<T, N> value;
+  JSRef param;
+  JSContext* ctx;
+
+  OutputArg(JSContext* _ctx, JSValueConst _arg) : param(_arg), ctx(_ctx) {
+    is_null = JS_IsNull(_arg) || JS_IsUndefined(_arg);
+
+    if(!is_null) {
+       value = JSVal<std::array<T,N> >::to(ctx, _arg);
+     }
+  }
+
+  ~OutputArg() {
+    if(!is_null) {
+       JSVal< std::array<T,N> >::from(ctx, value, param.param);
+    }
+  }
+
+ // operator std::array<T,N>() { return is_null ? nullptr : &value; }
+  operator T*() { return is_null ? nullptr : value.data(); }
 };
 
 #endif /* defined(QUICKJS_IMGUI_HPP) */

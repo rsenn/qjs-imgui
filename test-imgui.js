@@ -139,6 +139,7 @@ let show_about_box = ImGui.Pointer(
 let show_demo_window = ImGui.Pointer(false);
 let show_light_bg = ImGui.Pointer(true);
 let slider_value = ImGui.Pointer(0);
+let slider2_value = [0, 0];
 
 function main() {
   window = new glfw.Window(800, 600, 'ImGui test');
@@ -168,8 +169,10 @@ function main() {
     ImGui.Checkbox('Show About', show_about_box);
     ImGui.Checkbox('Show Demo Window', show_demo_window);
     ImGui.Checkbox('Light Background', show_light_bg);
-    ImGui.SliderFloat('Slider', slider_value, 0, 300, "%3.0f", 0);
+    ImGui.SliderFloat('Slider', slider_value, 0, 300, '%3.0f', 0);
+    ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
 
+    console.log('slider2_value', slider2_value);
 
     //if(ImGui.Button(!show_light_bg() ? 'Light' : 'Dark')) show_light_bg(!show_light_bg());
     //if(ImGui.Button((!show_about_box() ? 'Show' : 'Hide') + ' about')) show_about_box(!show_about_box());

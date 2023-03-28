@@ -1404,7 +1404,26 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         JS_FreeCString(ctx, format);
       break;
     }
-    case IMGUI_SLIDER_FLOAT2: break;
+    case  IMGUI_SLIDER_FLOAT2: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      OutputArg< std::array<float,2> > p_values(ctx, argv[1]);
+      double vmin = 0, vmax = 1;
+      const char* format = 0;
+      int32_t flags = 0;
+
+      JS_ToFloat64(ctx, &vmin, argv[2]);
+      JS_ToFloat64(ctx, &vmax, argv[3]);
+      if(argc > 4)
+        format = JS_ToCString(ctx, argv[4]);
+      if(argc > 5)
+        JS_ToInt32(ctx, &flags, argv[5]);
+
+      ret = JS_NewBool(ctx, ImGui::SliderFloat2(label,  static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
+
+      if(format)
+        JS_FreeCString(ctx, format);
+      break;
+    }
     case IMGUI_SLIDER_FLOAT3: break;
     case IMGUI_SLIDER_FLOAT4: break;
     case IMGUI_SLIDER_ANGLE: break;
