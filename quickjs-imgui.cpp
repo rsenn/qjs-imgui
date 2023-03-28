@@ -1596,12 +1596,12 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     case IMGUI_INPUT_INT: {
       const char* label = JS_ToCString(ctx, argv[0]);
       OutputArg<int> p_value(ctx, argv[1]);
-      int32_t step = 0, step_fast = 0,flags = 0;
- 
+      int32_t step = 0, step_fast = 0, flags = 0;
+
       JS_ToInt32(ctx, &step, argv[2]);
       JS_ToInt32(ctx, &step_fast, argv[3]);
 
-       if(argc > 4)
+      if(argc > 4)
         JS_ToInt32(ctx, &flags, argv[4]);
 
       ret = JS_NewBool(ctx, ImGui::InputInt(label, p_value, step, step_fast, ImGuiInputTextFlags(flags)));
@@ -1631,7 +1631,27 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         JS_FreeCString(ctx, format);
       break;
     }
-    case IMGUI_INPUT_SCALAR: break;
+    case IMGUI_INPUT_SCALAR: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      OutputArg<double> p_value(ctx, argv[1]);
+      double step = 0, step_fast = 0;
+      const char* format = 0;
+      int32_t flags = 0;
+
+      JS_ToFloat64(ctx, &step, argv[2]);
+      JS_ToFloat64(ctx, &step_fast, argv[3]);
+
+      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+        format = JS_ToCString(ctx, argv[4]);
+      if(argc > 5)
+        JS_ToInt32(ctx, &flags, argv[5]);
+
+      ret = JS_NewBool(ctx, ImGui::InputScalar(label, p_value, step, step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
+
+      if(format)
+        JS_FreeCString(ctx, format);
+      break;
+    }
     case IMGUI_INPUT_SCALAR_N: break;
     case IMGUI_COLOR_EDIT3: break;
     case IMGUI_COLOR_EDIT4: break;

@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <array>
+//#include <variant>
 
 struct imgui;
 
@@ -259,5 +260,57 @@ public:
   // operator std::array<T,N>() { return is_null ? nullptr : &value; }
   operator T*() { return is_null ? nullptr : value.data(); }
 };
+
+template<enum ImGuiDataType_ type> struct ScalarType {};
+
+template<> struct ScalarType<ImGuiDataType_S8> { typedef int8_t value_type; };
+template<> struct ScalarType<ImGuiDataType_U8> { typedef uint8_t value_type; };
+template<> struct ScalarType<ImGuiDataType_S16> { typedef int16_t value_type; };
+template<> struct ScalarType<ImGuiDataType_U16> { typedef uint16_t value_type; };
+template<> struct ScalarType<ImGuiDataType_S32> { typedef int32_t value_type; };
+template<> struct ScalarType<ImGuiDataType_U32> { typedef uint32_t value_type; };
+template<> struct ScalarType<ImGuiDataType_S64> { typedef int64_t value_type; };
+template<> struct ScalarType<ImGuiDataType_U64> { typedef uint64_t value_type; };
+template<> struct ScalarType<ImGuiDataType_Float> { typedef float value_type; };
+template<> struct ScalarType<ImGuiDataType_Double> { typedef double value_type; };
+
+union ImGuiDataTypeUnion {
+  ScalarType<ImGuiDataType_S8>::value_type s8;
+  ScalarType<ImGuiDataType_U8>::value_type u8;
+  ScalarType<ImGuiDataType_S16>::value_type s16;
+  ScalarType<ImGuiDataType_U16>::value_type u16;
+  ScalarType<ImGuiDataType_S32>::value_type s32;
+  ScalarType<ImGuiDataType_U32>::value_type u32;
+  ScalarType<ImGuiDataType_S64>::value_type s64;
+  ScalarType<ImGuiDataType_U64>::value_type u64;
+  ScalarType<ImGuiDataType_Float>::value_type f32;
+  ScalarType<ImGuiDataType_Double>::value_type f64;
+};
+
+template<enum ImGuiDataType_ type> void set_scalar(union ImGuiDataTypeUnion& data, typename ScalarType<type>::value_type value);
+template<> void set_scalar<ImGuiDataType_S8>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S8>::value_type value) { data.s8 = value; }
+template<> void set_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U8>::value_type value) { data.u8 = value; }
+template<> void set_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S16>::value_type value) { data.s16 = value; }
+template<> void set_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U16>::value_type value) { data.u16 = value; }
+template<> void set_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S32>::value_type value) { data.s32 = value; }
+template<> void set_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U32>::value_type value) { data.u32 = value; }
+template<> void set_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S64>::value_type value) { data.s64 = value; }
+template<> void set_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U64>::value_type value) { data.u64 = value; }
+template<> void set_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_Float>::value_type value) { data.f32 = value; }
+template<> void set_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_Double>::value_type value) { data.f64 = value; }
+template<enum ImGuiDataType_ type> typename ScalarType<type>::value_type get_scalar(union ImGuiDataTypeUnion const& data);
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_S8>(union ImGuiDataTypeUnion const& data) { return data.s8; }
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion const& data) { return data.u8; }
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion const& data) { return data.s16; }
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion const& data) { return data.u16; }
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion const& data) { return data.s32; }
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion const& data) { return data.u32; }
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion const& data) { return data.s64; }
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion const& data) { return data.u64; }
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion const& data) { return data.f32; }
+template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion const& data) { return data.f64; }
+
+
+// typedef std::variant<int64_t, uint64_t, float, double> ImGuiDataTypeVariant;
 
 #endif /* defined(QUICKJS_IMGUI_HPP) */

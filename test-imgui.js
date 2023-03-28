@@ -179,16 +179,16 @@ function main() {
     ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
     ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
 
-    let s8_v = new Int8Array(1).buffer;
-    let u8_v =  new Uint8Array(1).buffer;
-    let s16_v = new Int16Array(1).buffer;
-    let u16_v =  new Uint16Array(1).buffer;
-    let s32_v = new Int32Array(1).buffer;
-    let u32_v =  new Uint32Array(1).buffer;
-    let s64_v = new BigInt64Array(1).buffer;
-    let u64_v =  new BigUint64Array(1).buffer;
-  let f32_v = new Float32Array(1).buffer;
-    let f64_v =  new Float64Array(1).buffer;
+    let s8_v = new Int8Array(1);
+    let u8_v =  new Uint8Array(1);
+    let s16_v = new Int16Array(1);
+    let u16_v =  new Uint16Array(1);
+    let s32_v = new Int32Array([-1337]);
+    let u32_v =  new Uint32Array([1337]);
+    let s64_v = new BigInt64Array([-1000n]);
+    let u64_v =  new BigUint64Array([1000n]);
+  let f32_v = new Float32Array([Math.PI]);
+    let f64_v =  new Float64Array([Math.E]);
     
     ImGui.InputScalar('input s8', ImGui.DataType.S8, s8_v, null, null, '%d');
     ImGui.InputScalar('input u8', ImGui.DataType.U8, u8_v, null, null, '%u');
