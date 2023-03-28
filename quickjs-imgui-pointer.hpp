@@ -60,10 +60,7 @@ js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
     case INVOKE: ret = JS_Invoke(ctx, ptr->obj, ptr->prop, argc, argv); break;
     case PROPERTY: JS_SetProperty(ctx, ptr->obj, ptr->prop, JS_DupValue(ctx, argv[0])); break;
     case GETSET: ret = JS_Call(ctx, ptr->set, JS_UNDEFINED, argc, argv); break;
-    case INTERNAL:
-      JS_FreeValue(ctx, ptr->obj);
-      ptr->obj = JS_DupValue(ctx, argv[0]);
-      break;
+    case INTERNAL: JS_FreeValue(ctx, ptr->obj), ptr->obj = JS_DupValue(ctx, argv[0]); break;
   }
 
   return ret;
