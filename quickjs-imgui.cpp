@@ -221,6 +221,34 @@ js_imgui_formatargs(JSContext* ctx, int argc, JSValueConst argv[], void* output[
   // JS_FreeCString(ctx, fmt);
 }
 
+struct InputTextUserData {
+  JSContext* ctx;
+  JSValue fn, buf;
+};
+
+int
+js_imgui_input_text_callback(ImGuiInputTextCallbackData* data) {
+  InputTextUserData* user_data = static_cast<InputTextUserData*>(data->UserData);
+  JSContext* ctx = user_data->ctx;
+  JSValue obj = JS_NewObject(ctx);
+  
+  JS_SetPropertyStr(ctx, obj, "EventFlag", JS_NewInt32(ctx, data->EventFlag));
+  JS_SetPropertyStr(ctx, obj, "Flags", JS_NewInt32(ctx, data->Flags));
+  JS_SetPropertyStr(ctx, obj, "EventChar", JS_NewUint32(ctx, data->EventChar));
+  JS_SetPropertyStr(ctx, obj, "EventKey", JS_NewUint32(ctx, data->EventKey));
+  JS_SetPropertyStr(ctx, obj, "Buf", JS_DupValue(ctx, user_data->buf));
+  JS_SetPropertyStr(ctx, obj, "BufTextLen", JS_NewInt32(ctx, data->BufTextLen));
+  JS_SetPropertyStr(ctx, obj, "BufSize", JS_NewUint32(ctx, data->BufSize));
+  JS_SetPropertyStr(ctx, obj, "BufDirty", JS_NewBool(ctx, data->BufDirty));
+  JS_SetPropertyStr(ctx, obj, "CursorPos", JS_NewInt32(ctx, data->CursorPos));
+  JS_SetPropertyStr(ctx, obj, "SelectionStart", JS_NewInt32(ctx, data->SelectionStart));
+  JS_SetPropertyStr(ctx, obj, "SelectionEnd", JS_NewInt32(ctx, data->SelectionEnd));
+
+  JSValue ret = JS_Call(ctx, user_data->fn, JS_UNDEFINED, 1, &obj);
+  JS_FreeValue(ctx, ret);
+  return 0;
+}
+
 #include "quickjs-imgui-style.hpp"
 
 enum {
@@ -1474,7 +1502,42 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     case IMGUI_V_SLIDER_FLOAT: break;
     case IMGUI_V_SLIDER_INT: break;
     case IMGUI_V_SLIDER_SCALAR: break;
-    case IMGUI_INPUT_TEXT: break;
+    case IMGUI_INPUT_TEXT: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      uint32_t buf_size;
+      size_t size;
+      uint8_t* buffer;
+      int32_t flags = 0;
+      ImGuiInputTextCallback cb = nullptr;
+      void* user_data = nullptr;
+      InputTextUserData context = {ctx, JS_NULL};
+
+      if(!(buffer = JS_GetArrayBuffer(ctx, &size, argv[1]))) {
+        ret = JS_ThrowTypeError(ctx, "argument 2 must be an ArrayBuffer");
+        break;
+      }
+
+      buf_size = size;
+      if(argc > 2)
+        JS_ToUint32(ctx, &buf_size, argv[2]);
+      if(argc > 3)
+        JS_ToInt32(ctx, &flags, argv[3]);
+      if(argc > 4) {
+        if(!JS_IsFunction(ctx, argv[4])) {
+          ret = JS_ThrowTypeError(ctx, "argument 5 must be a Function");
+          break;
+        }
+
+        cb = &js_imgui_input_text_callback;
+        user_data = &context;
+        context.buf = argv[1];
+        context.fn = argv[4];
+      }
+
+      ret = JS_NewBool(ctx, ImGui::InputText(label, reinterpret_cast<char*>(buffer), buf_size, ImGuiInputTextFlags(flags), cb, user_data));
+
+      break;
+    }
     case IMGUI_INPUT_TEXT_MULTILINE: break;
     case IMGUI_INPUT_TEXT_WITH_HINT: break;
     case IMGUI_INPUT_FLOAT: break;
