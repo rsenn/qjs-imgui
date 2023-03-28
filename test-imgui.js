@@ -121,23 +121,26 @@ function main() {
       v => (show_app_main_menu_bar = v)
     );
 
-    console.log('ptr()', ptr());
+    /*console.log('ptr()', ptr());
     console.log((ptr(true), 'ptr(true)'));
     console.log('ptr()', ptr());
-    console.log((ptr(false), 'ptr(false)'));
-    console.log('show_app_main_menu_bar', show_app_main_menu_bar);
+    console.log((ptr(false), 'ptr(false)'));*/
 
     // Menu Bar
     if(ImGui.BeginMenuBar()) {
       if(ImGui.BeginMenu('Menu')) {
         ShowExampleMenuFile();
-        console.log('ShowExampleMenuFile()');
         ImGui.EndMenu();
       }
       if(ImGui.BeginMenu('Examples')) {
-        ImGui.MenuItem('Main menu bar', null, v =>
-          v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v)
+        ImGui.MenuItem(
+          'Main menu bar',
+          null,
+          ptr ?? (v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v)))
         );
+
+        //console.log('show_app_main_menu_bar', show_app_main_menu_bar);
+
         ImGui.MenuItem('Console', null, v => (v === undefined ? show_app_console : (show_app_console = v)));
         ImGui.MenuItem('Log', null, v => (v === undefined ? show_app_log : (show_app_log = v)));
         ImGui.MenuItem('Simple layout', null, v => (v === undefined ? show_app_layout : (show_app_layout = v)));

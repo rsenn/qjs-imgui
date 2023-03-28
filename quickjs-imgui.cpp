@@ -1169,7 +1169,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     }
     case IMGUI_TEXT_UNFORMATTED: {
       const char *text = JS_ToCString(ctx, argv[0]), *text_end = 0;
-      if(argc >= 2)
+      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
         text_end = JS_ToCString(ctx, argv[1]);
       ImGui::TextUnformatted(text, text_end);
       JS_FreeCString(ctx, text);
@@ -1315,7 +1315,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       JS_ToFloat64(ctx, &fraction, argv[0]);
       if(argc >= 2)
         size_arg = js_imgui_getimvec2(ctx, argv[1]);
-      if(argc >= 3)
+      if(argc >= 3 && !(JS_IsNull(argv[2]) || JS_IsUndefined(argv[2])))
         overlay = JS_ToCString(ctx, argv[2]);
       ImGui::ProgressBar(fraction, size_arg, overlay);
       if(overlay)
@@ -1533,7 +1533,9 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       bool enabled = true;
       if(argc >= 2)
         enabled = JS_ToBool(ctx, argv[1]);
-      ImGui::BeginMenu(label, enabled);
+
+      ret = JS_NewBool(ctx, ImGui::BeginMenu(label, enabled));
+
       JS_FreeCString(ctx, label);
       break;
     }
@@ -1542,11 +1544,14 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       break;
     }
     case IMGUI_MENU_ITEM: {
-      const char *label = JS_ToCString(ctx, argv[0]), *shortcut = 0;
+      const char *label = JS_ToCString(ctx, argv[0]), *shortcut = nullptr;
       OutputArg<bool> selected(ctx, argc >= 3 ? argv[2] : JS_NULL);
-      if(argc >= 2)
+
+      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
         shortcut = JS_ToCString(ctx, argv[1]);
+
       ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, selected, argc >= 4 ? JS_ToBool(ctx, argv[3]) : true));
+
       JS_FreeCString(ctx, label);
       if(shortcut)
         JS_FreeCString(ctx, shortcut);
@@ -1775,7 +1780,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       bool border = true;
       if(argc >= 1)
         JS_ToInt32(ctx, &count, argv[0]);
-      if(argc >= 2)
+      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
         id = JS_ToCString(ctx, argv[1]);
       if(argc >= 3)
         border = JS_ToBool(ctx, argv[2]);
@@ -1880,7 +1885,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       const char* filename = 0;
       if(argc >= 1)
         JS_ToInt32(ctx, &auto_open_depth, argv[0]);
-      if(argc >= 2)
+      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
         filename = JS_ToCString(ctx, argv[1]);
       ImGui::LogToFile(auto_open_depth, filename);
       if(filename)
@@ -2089,7 +2094,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       const char *text = JS_ToCString(ctx, argv[0]), *text_end = 0;
       bool hide_text_after_double_hash = false;
       double wrap_width = -1.0f;
-      if(argc >= 2)
+      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
         text_end = JS_ToCString(ctx, argv[1]);
       if(argc >= 3)
         hide_text_after_double_hash = JS_ToBool(ctx, argv[2]);
@@ -2762,7 +2767,7 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   JS_NewClass(JS_GetRuntime(ctx), js_imgui_pointer_class_id, &js_imgui_pointer_class);
 
   imgui_pointer_proto = JS_NewObject(ctx);
- 
+
   JS_SetPropertyFunctionList(ctx, imgui_pointer_proto, js_imgui_pointer_funcs, countof(js_imgui_pointer_funcs));
   JS_SetClassProto(ctx, js_imgui_pointer_class_id, imgui_pointer_proto);
 

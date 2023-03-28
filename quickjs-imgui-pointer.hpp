@@ -122,7 +122,7 @@ static JSValue
 js_imgui_pointer_call(JSContext* ctx, JSValueConst func_obj, JSValueConst this_val, int argc, JSValueConst argv[], int flags) {
   ImGuiPointerClosure* ptr;
   JSValue ret = JS_UNDEFINED;
-  
+
   if(!(ptr = static_cast<ImGuiPointerClosure*>(JS_GetOpaque2(ctx, func_obj, js_imgui_pointer_class_id))))
     return JS_EXCEPTION;
 
@@ -142,7 +142,7 @@ static JSClassDef js_imgui_pointer_class = {
 };
 
 static const JSCFunctionListEntry js_imgui_pointer_funcs[] = {
-       JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGuiPointer", JS_PROP_CONFIGURABLE),
+    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGuiPointer", JS_PROP_CONFIGURABLE),
 
 };
 
