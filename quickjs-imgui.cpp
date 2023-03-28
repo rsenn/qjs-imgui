@@ -1633,20 +1633,23 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     }
     case IMGUI_INPUT_SCALAR: {
       const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<double> p_value(ctx, argv[1]);
-      double step = 0, step_fast = 0;
+      OutputArg<union ImGuiDataTypeUnion> p_value(ctx, argv[2]);
       const char* format = 0;
-      int32_t flags = 0;
+      int32_t data_type = 0, flags = 0;
+      union ImGuiDataTypeUnion scalar, step, step_fast;
 
-      JS_ToFloat64(ctx, &step, argv[2]);
-      JS_ToFloat64(ctx, &step_fast, argv[3]);
+      JS_ToInt32(ctx, &data_type, argv[1]);
 
-      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-        format = JS_ToCString(ctx, argv[4]);
-      if(argc > 5)
-        JS_ToInt32(ctx, &flags, argv[5]);
+      js_to_scalar(ctx, p_value, argv[2], ImGuiDataType_(data_type));
+      js_to_scalar(ctx, &step, argv[3], ImGuiDataType_(data_type));
+      js_to_scalar(ctx, &step_fast, argv[4], ImGuiDataType_(data_type));
 
-      ret = JS_NewBool(ctx, ImGui::InputScalar(label, p_value, step, step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
+      if(argc > 5 && !(JS_IsUndefined(argv[5]) || JS_IsNull(argv[5])))
+        format = JS_ToCString(ctx, argv[5]);
+      if(argc > 6)
+        JS_ToInt32(ctx, &flags, argv[6]);
+
+      ret = JS_NewBool(ctx, ImGui::InputScalar(label, ImGuiDataType(data_type), static_cast<void*>(p_value), &step, &step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
 
       if(format)
         JS_FreeCString(ctx, format);

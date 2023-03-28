@@ -310,7 +310,90 @@ template<> ScalarType<ImGuiDataType_U64>::value_type get_scalar<ImGuiDataType_U6
 template<> ScalarType<ImGuiDataType_Float>::value_type get_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion const& data) { return data.f32; }
 template<> ScalarType<ImGuiDataType_Double>::value_type get_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion const& data) { return data.f64; }
 
+int
+js_to_scalar(JSContext* ctx, union ImGuiDataTypeUnion* data, JSValueConst value, enum ImGuiDataType_ type) {
+  switch(type) {
+    case ImGuiDataType_S8: {
+      int32_t n;
+      int ret = JS_ToInt32(ctx, &n, value);
+      data->s8 = n;
+      return ret;
+    }
+    case ImGuiDataType_U8: {
+      uint32_t n;
+      int ret = JS_ToUint32(ctx, &n, value);
+      data->u8 = n;
+      return ret;
+    }
+    case ImGuiDataType_S16: {
+      int32_t n;
+      int ret = JS_ToInt32(ctx, &n, value);
+      data->s16 = n;
+      return ret;
+    }
+    case ImGuiDataType_U16: {
+      uint32_t n;
+      int ret = JS_ToUint32(ctx, &n, value);
+      data->u16 = n;
+      return ret;
+    }
+    case ImGuiDataType_S32: {
+      return JS_ToInt32(ctx, &data->s32, value);
+    }
+    case ImGuiDataType_U32: {
+      return JS_ToUint32(ctx, &data->u32, value);
+    }
+    case ImGuiDataType_S64: {
+      return JS_ToInt64(ctx, &data->s64, value);
+    }
+    case ImGuiDataType_U64: {
+      return JS_ToIndex(ctx, &data->u64, value);
+    }
+    case ImGuiDataType_Float: {
+      double n;
+      int ret = JS_ToFloat64(ctx, &n, value);
+      data->f32 = n;
+      return ret;
+    }
+    case ImGuiDataType_Double: {
+      return JS_ToFloat64(ctx, &data->f64, value);
+    }
+  }
+}
 
-// typedef std::variant<int64_t, uint64_t, float, double> ImGuiDataTypeVariant;
+JSValue
+js_from_scalar(JSContext* ctx, union ImGuiDataTypeUnion const* data, enum ImGuiDataType_ type) {
+  switch(type) {
+    case ImGuiDataType_S8: return JS_NewInt32(ctx, data->s8);
+    case ImGuiDataType_U8: return JS_NewUint32(ctx, data->u8);
+    case ImGuiDataType_S16: return JS_NewInt32(ctx, data->s16);
+    case ImGuiDataType_U16: return JS_NewUint32(ctx, data->u16);
+    case ImGuiDataType_S32: return JS_NewInt32(ctx, data->s32);
+    case ImGuiDataType_U32: return JS_NewUint32(ctx, data->u32);
+    case ImGuiDataType_S64: return JS_NewBigInt64(ctx, data->s64);
+    case ImGuiDataType_U64: return JS_NewBigUint64(ctx, data->u64);
+    case ImGuiDataType_Float: return JS_NewFloat64(ctx, data->f32);
+    case ImGuiDataType_Double: return JS_NewFloat64(ctx, data->f64);
+  }
+}
+
+template<> class OutputArg<union ImGuiDataTypeUnion> {
+public:
+  union ImGuiDataTypeUnion* ptr;
+  size_t len;
+
+  OutputArg(JSContext* ctx, JSValueConst _arg) {
+    JSAtom bufatom = JS_NewAtom(ctx, "buffer");
+    JSValue bufval = JS_HasProperty(ctx, _arg, bufatom) ? JS_GetProperty(ctx, _arg, bufatom) : JS_DupValue(ctx, _arg);
+    uint8_t* bufptr = JS_GetArrayBuffer(ctx, &len, bufval);
+    ptr = reinterpret_cast<union ImGuiDataTypeUnion*>(bufptr);
+    JS_FreeValue(ctx, bufval);
+  }
+  ~OutputArg() {}
+
+  operator void*() { return ptr; }
+  operator union ImGuiDataTypeUnion *() { return ptr; }
+};
+
 
 #endif /* defined(QUICKJS_IMGUI_HPP) */
