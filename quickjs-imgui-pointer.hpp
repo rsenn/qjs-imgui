@@ -109,7 +109,7 @@ js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst a
 
       ptr->magic = magic;
       ptr->obj = JS_DupValue(ctx, argv[0]);
-      ptr->type = is_function ? (argc >= 2 && !JS_IsUndefined(argv[1])) ? JS_IsFunction(ctx, argv[1]) ? GETSET : INVOKE : CALL : argc > 0 ? PROPERTY : INTERNAL;
+      ptr->type = is_function ? (argc >= 2 && !JS_IsUndefined(argv[1])) ? JS_IsFunction(ctx, argv[1]) ? GETSET : INVOKE : CALL : argc >= 2 ? PROPERTY : INTERNAL;
       ptr->prop = JS_ValueToAtom(ctx, argc >= 2 && !JS_IsFunction(ctx, argv[1]) ? argv[1] : JS_UNDEFINED);
       ptr->set = ptr->type == GETSET ? JS_DupValue(ctx, argv[1]) : JS_UNDEFINED;
 
