@@ -150,7 +150,6 @@ static JSClassDef js_imgui_pointer_class = {
 
 static const JSCFunctionListEntry js_imgui_pointer_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGuiPointer", JS_PROP_CONFIGURABLE),
-
 };
 
 #endif // defined(QUICKJS_IMGUI_POINTER_HPP)
