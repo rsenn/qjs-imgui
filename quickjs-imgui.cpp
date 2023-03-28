@@ -2758,14 +2758,13 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   JS_SetPropertyFunctionList(ctx, imfontatlas_proto, js_imfontatlas_funcs, countof(js_imfontatlas_funcs));
   JS_SetClassProto(ctx, js_imfontatlas_class_id, imfontatlas_proto);
 
-
   JS_NewClassID(&js_imgui_pointer_class_id);
   JS_NewClass(JS_GetRuntime(ctx), js_imgui_pointer_class_id, &js_imgui_pointer_class);
 
-  imgui_pointer_ctor = JS_NewObject(ctx); //JS_NewCFunction2(ctx, js_imgui_pointer_constructor, "ImGuiPointer", 1, JS_CFUNC_constructor, 0);
+  imgui_pointer_ctor = JS_NewObject(ctx); // JS_NewCFunction2(ctx, js_imgui_pointer_constructor, "ImGuiPointer", 1, JS_CFUNC_constructor, 0);
   imgui_pointer_proto = JS_NewObject(ctx);
 
-  //JS_SetPropertyFunctionList(ctx, imgui_pointer_proto, js_imgui_pointer_funcs, countof(js_imgui_pointer_funcs));
+  // JS_SetPropertyFunctionList(ctx, imgui_pointer_proto, js_imgui_pointer_funcs, countof(js_imgui_pointer_funcs));
   JS_SetClassProto(ctx, js_imgui_pointer_class_id, imgui_pointer_proto);
 
   if(m) {
