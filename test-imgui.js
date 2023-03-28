@@ -119,14 +119,14 @@ function main() {
     let ptr = ImGui.Pointer(
       () => show_app_main_menu_bar,
       v => (show_app_main_menu_bar = v)
-    ); 
+    );
 
-    let ptr2 = ImGui.Pointer();
+    let ptr2 = ImGui.Pointer(false);
 
-   console.log('ptr2()', ptr2());
+    /*console.log('ptr2()', ptr2());
     console.log((ptr2(true), 'ptr2(true)'));
     console.log('ptr2()', ptr2());
-    console.log((ptr2(false), 'ptr2(false)'));
+    console.log((ptr2(false), 'ptr2(false)'));*/
 
     // Menu Bar
     if(ImGui.BeginMenuBar()) {

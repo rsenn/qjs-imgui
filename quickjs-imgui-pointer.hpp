@@ -13,8 +13,8 @@ thread_local JSValue imgui_pointer_proto = {JS_TAG_UNDEFINED};
 
 enum ImGuiPointerType {
   PROPERTY = 0,
-  CALL ,
-  INVOKE ,
+  CALL,
+  INVOKE,
   GETSET,
   INTERNAL,
 };
@@ -23,6 +23,10 @@ struct ImGuiPointerClosure {
   int magic;
   union {
     JSValue obj;
+    struct {
+      JSValue funcObj;
+      JSValue thisObj;
+    };
     struct {
       JSValue get;
       JSValue set;
@@ -56,8 +60,12 @@ js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
     case INVOKE: ret = JS_Invoke(ctx, ptr->obj, ptr->prop, argc, argv); break;
     case PROPERTY: JS_SetProperty(ctx, ptr->obj, ptr->prop, JS_DupValue(ctx, argv[0])); break;
     case GETSET: ret = JS_Call(ctx, ptr->set, JS_UNDEFINED, argc, argv); break;
-    case INTERNAL: JS_FreeValue(ctx, ptr->obj);  ptr->obj = JS_DupValue(ctx, argv[0]); break;
+    case INTERNAL:
+      JS_FreeValue(ctx, ptr->obj);
+      ptr->obj = JS_DupValue(ctx, argv[0]);
+      break;
   }
+
   return ret;
 }
 
@@ -73,6 +81,7 @@ js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
     case GETSET: ret = JS_Call(ctx, ptr->get, JS_UNDEFINED, 0, 0); break;
     case INTERNAL: ret = JS_DupValue(ctx, ptr->obj); break;
   }
+
   return ret;
 }
 
@@ -105,13 +114,22 @@ js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst a
       if(!(ptr = static_cast<ImGuiPointerClosure*>(js_malloc(ctx, sizeof(ImGuiPointerClosure)))))
         return JS_ThrowOutOfMemory(ctx);
 
-      BOOL is_function = JS_IsFunction(ctx, argv[0]);
+     ImGuiPointerType type(INTERNAL);
+
+      if(JS_IsFunction(ctx, argv[0]))
+        type = (argc > 1 &&  JS_IsFunction(ctx, argv[1])) ? GETSET : CALL;
+      else if(argc > 1 && (JS_IsString(argv[1]) || JS_IsSymbol(argv[1])) && JS_IsObject(argv[0]))
+        type = PROPERTY;
+      else if(argc > 1 && (JS_IsString(argv[0]) || JS_IsSymbol(argv[0])) && JS_IsObject(argv[1]))
+        type = INVOKE;
+      else
+        type = INTERNAL;
 
       ptr->magic = magic;
-      ptr->obj = JS_DupValue(ctx, argv[0]);
-      ptr->type = is_function ? (argc >= 2 && !JS_IsUndefined(argv[1])) ? JS_IsFunction(ctx, argv[1]) ? GETSET : INVOKE : CALL : argc >= 2 ? PROPERTY : INTERNAL;
-      ptr->prop = JS_ValueToAtom(ctx, argc >= 2 && !JS_IsFunction(ctx, argv[1]) ? argv[1] : JS_UNDEFINED);
-      ptr->set = ptr->type == GETSET ? JS_DupValue(ctx, argv[1]) : JS_UNDEFINED;
+      ptr->obj = JS_DupValue(ctx, argv[type==INVOKE ? 1 : 0]);
+      ptr->type = type;
+      ptr->prop = JS_ValueToAtom(ctx, (type == INVOKE || type == PROPERTY) ? argv[type==INVOKE ? 0 : 1] : JS_UNDEFINED);
+      ptr->set = type == GETSET || (type == CALL && argc > 1) ? JS_DupValue(ctx, argv[1]) : JS_UNDEFINED;
 
       ret = JS_NewObjectProtoClass(ctx, imgui_pointer_proto, js_imgui_pointer_class_id);
 
