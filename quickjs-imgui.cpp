@@ -2691,10 +2691,10 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_OBJECT_DEF("MouseButton", js_imgui_mousebutton, countof(js_imgui_mousebutton), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("MouseCursor", js_imgui_mousecursor, countof(js_imgui_mousecursor), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("Cond", js_imgui_cond, countof(js_imgui_cond), JS_PROP_ENUMERABLE),
-    JS_CFUNC_MAGIC_DEF("Pointer", 1, js_imgui_pointer, 0),
-    JS_CFUNC_MAGIC_DEF("PointerGetter", 1, js_imgui_pointer, 1),
-    JS_CFUNC_MAGIC_DEF("PointerSetter", 1, js_imgui_pointer, 2),
-    JS_CFUNC_MAGIC_DEF("PointerGetSet", 1, js_imgui_pointer, 3),
+    JS_CFUNC_MAGIC_DEF("Pointer", 1, js_imgui_pointer, POINTER_CALL),
+    JS_CFUNC_MAGIC_DEF("PointerGetter", 1, js_imgui_pointer, POINTER_GET),
+    JS_CFUNC_MAGIC_DEF("PointerSetter", 1, js_imgui_pointer, POINTER_SET),
+    JS_CFUNC_MAGIC_DEF("PointerGetSet", 1, js_imgui_pointer, POINTER_GETSET),
 };
 
 #include "quickjs-imgui-inputtextcallbackdata.hpp"
@@ -2761,10 +2761,9 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   JS_NewClassID(&js_imgui_pointer_class_id);
   JS_NewClass(JS_GetRuntime(ctx), js_imgui_pointer_class_id, &js_imgui_pointer_class);
 
-  imgui_pointer_ctor = JS_NewObject(ctx); // JS_NewCFunction2(ctx, js_imgui_pointer_constructor, "ImGuiPointer", 1, JS_CFUNC_constructor, 0);
   imgui_pointer_proto = JS_NewObject(ctx);
-
-  // JS_SetPropertyFunctionList(ctx, imgui_pointer_proto, js_imgui_pointer_funcs, countof(js_imgui_pointer_funcs));
+ 
+  JS_SetPropertyFunctionList(ctx, imgui_pointer_proto, js_imgui_pointer_funcs, countof(js_imgui_pointer_funcs));
   JS_SetClassProto(ctx, js_imgui_pointer_class_id, imgui_pointer_proto);
 
   if(m) {
@@ -2774,7 +2773,6 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
     JS_SetModuleExport(ctx, m, "ImGuiPayload", imgui_payload_ctor);
     JS_SetModuleExport(ctx, m, "ImFont", imfont_ctor);
     JS_SetModuleExport(ctx, m, "ImFontAtlas", imfontatlas_ctor);
-    JS_SetModuleExport(ctx, m, "ImGuiPointer", imgui_pointer_ctor);
     JS_SetModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
   }
 
@@ -2792,7 +2790,6 @@ js_init_module(JSContext* ctx, const char* module_name) {
   JS_AddModuleExport(ctx, m, "ImGuiPayload");
   JS_AddModuleExport(ctx, m, "ImFont");
   JS_AddModuleExport(ctx, m, "ImFontAtlas");
-  JS_AddModuleExport(ctx, m, "ImGuiPointer");
   JS_AddModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
   return m;
 }
