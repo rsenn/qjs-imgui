@@ -10,6 +10,8 @@ let menuEnabled,
   intValue = 0,
   boolValue = true;
 
+  let checked = true;
+
 // Note that shortcuts are currently provided for display only
 // (future version will add explicit flags to BeginMenu() to request processing shortcuts)
 function ShowExampleMenuFile() {
@@ -60,9 +62,10 @@ function ShowExampleMenuFile() {
 
       let dl = ImGui.GetWindowDrawList();
 
-      console.log('GetWindowDrawList() =', dl);
-      if(dl) dl.AddRectFilled(p, [p.x + sz, p.y + sz], ImGui.GetColorU32(i));
-
+      if(dl) {
+        console.log('GetWindowDrawList() =', dl);
+        dl.AddRectFilled(p, [p.x + sz, p.y + sz], ImGui.GetColorU32(i));
+      }
       ImGui.Dummy([sz, sz]);
       ImGui.SameLine();
       ImGui.MenuItem(name);
@@ -83,7 +86,9 @@ function ShowExampleMenuFile() {
     // Disabled
     throw new Error(`IM_ASSERT(0)`);
   }
-  if(ImGui.MenuItem('Checked', null, true)) {
+  if(ImGui.MenuItem('Checked', null, checked)) {
+    checked = !checked;
+    console.log('checked =', checked);
   }
   if(ImGui.MenuItem('Quit', 'Alt+F4')) {
   }

@@ -20,6 +20,209 @@
 
 static bool imgui_is_initialized;
 
+static void
+js_imgui_init_gl(GLFWwindow* window) {
+  if(!imgui_is_initialized) {
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable vsync
+
+    // Decide GL+GLSL versions
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+    // GL ES 2.0 + GLSL 100
+    const char* glsl_version = "#version 100"
+#elif defined(__APPLE__)
+    // GL 3.2 + GLSL 150
+    const char* glsl_version = "#version 150";
+#else
+    // GL 3.0 + GLSL 130
+    const char* glsl_version = "#version 130";
+#endif
+
+        IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+  }
+
+  imgui_is_initialized = true;
+}
+
+static void
+js_imgui_free_func(JSRuntime* rt, void* opaque, void* ptr) {
+  ImGui::MemFree(ptr);
+}
+
+static ImVec2
+js_imgui_getimvec2(JSContext* ctx, JSValueConst value) {
+  JSValue xval = JS_UNDEFINED, yval = JS_UNDEFINED;
+  double x, y;
+  if(JS_IsArray(ctx, value)) {
+    xval = JS_GetPropertyUint32(ctx, value, 0);
+    yval = JS_GetPropertyUint32(ctx, value, 1);
+  } else if(JS_IsObject(value)) {
+    xval = JS_GetPropertyStr(ctx, value, "x");
+    yval = JS_GetPropertyStr(ctx, value, "y");
+  }
+  JS_ToFloat64(ctx, &x, xval);
+  JS_ToFloat64(ctx, &y, yval);
+  return ImVec2(x, y);
+}
+
+static ImVec4
+js_imgui_getimvec4(JSContext* ctx, JSValueConst value) {
+  JSValue xval = JS_UNDEFINED, yval = JS_UNDEFINED, zval = JS_UNDEFINED, wval = JS_UNDEFINED;
+  double x, y, z, w;
+  if(JS_IsArray(ctx, value)) {
+    xval = JS_GetPropertyUint32(ctx, value, 0);
+    yval = JS_GetPropertyUint32(ctx, value, 1);
+    zval = JS_GetPropertyUint32(ctx, value, 2);
+    wval = JS_GetPropertyUint32(ctx, value, 3);
+  } else if(JS_IsObject(value)) {
+    xval = JS_GetPropertyStr(ctx, value, "x");
+    yval = JS_GetPropertyStr(ctx, value, "y");
+    zval = JS_GetPropertyStr(ctx, value, "z");
+    wval = JS_GetPropertyStr(ctx, value, "w");
+  }
+  JS_ToFloat64(ctx, &x, xval);
+  JS_ToFloat64(ctx, &y, yval);
+  JS_ToFloat64(ctx, &x, zval);
+  JS_ToFloat64(ctx, &y, wval);
+  return ImVec4(x, y, z, w);
+}
+
+static ImVec4
+js_imgui_getcolor(JSContext* ctx, JSValueConst value) {
+  ImVec4 vec = {0, 0, 0, 0};
+  if(JS_IsObject(value)) {
+    vec = js_imgui_getimvec4(ctx, value);
+  } else if(JS_IsNumber(value)) {
+    uint32_t color = 0;
+    JS_ToUint32(ctx, &color, value);
+    vec = ImGui::ColorConvertU32ToFloat4(color);
+  } else if(JS_IsString(value)) {
+    const char *p, *str = JS_ToCString(ctx, value);
+    uint32_t color;
+    for(p = str; *p; p++)
+      if(isxdigit(*p))
+        break;
+    color = strtoul(p, 0, 16);
+    vec = ImGui::ColorConvertU32ToFloat4(color);
+    JS_FreeCString(ctx, str);
+  }
+  return vec;
+}
+
+static JSValue
+js_imgui_newptr(JSContext* ctx, void* ptr) {
+  char buf[128];
+  snprintf(buf, sizeof(buf), "%p", ptr);
+  return JS_NewString(ctx, buf);
+}
+
+template<class T>
+static T*
+js_imgui_getptr(JSContext* ctx, JSValueConst value) {
+  const char* str = JS_ToCString(ctx, value);
+  void* ptr = 0;
+  sscanf(str, "%p", &ptr);
+  JS_FreeCString(ctx, str);
+  return static_cast<T*>(ptr);
+}
+
+static ImTextureID
+js_imgui_gettexture(JSContext* ctx, JSValueConst value) {
+  if(JS_IsNumber(value)) {
+    uint64_t id;
+    JS_ToIndex(ctx, &id, value);
+    return ImTextureID(id);
+  }
+
+  return js_imgui_getptr<void>(ctx, value);
+}
+
+static JSValue
+js_imgui_newimvec2(JSContext* ctx, const ImVec2& vec) {
+  JSValue ret = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, vec.x));
+  JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, vec.y));
+  return ret;
+}
+
+static JSValue
+js_imgui_newimvec4(JSContext* ctx, const ImVec4& vec) {
+  JSValue ret = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, vec.x));
+  JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, vec.y));
+  JS_SetPropertyUint32(ctx, ret, 2, JS_NewFloat64(ctx, vec.z));
+  JS_SetPropertyUint32(ctx, ret, 3, JS_NewFloat64(ctx, vec.w));
+  return ret;
+}
+
+static int
+js_imgui_formatcount(JSContext* ctx, int argc, JSValueConst argv[]) {
+  const char *p, *end, *fmt;
+  int i = 0;
+  fmt = JS_ToCString(ctx, argv[i++]);
+  end = fmt + strlen(fmt);
+  for(p = fmt; p < end; p++) {
+    if(*p == '%' && p[1] != '%') {
+      ++p;
+      while(isdigit(*p) || *p == '.' || *p == '-' || *p == '+' || *p == '*') ++p;
+      ++i;
+    }
+  }
+  JS_FreeCString(ctx, fmt);
+  return i;
+}
+
+static void
+js_imgui_formatargs(JSContext* ctx, int argc, JSValueConst argv[], void* output[]) {
+  const char *p, *end, *fmt;
+  int i = 0;
+
+  fmt = JS_ToCString(ctx, argv[i]);
+  end = fmt + strlen(fmt);
+
+  output[i++] = (void*)fmt;
+
+  for(p = fmt; p < end; p++) {
+    if(*p == '%' && p[1] != '%') {
+      ++p;
+
+      while(isdigit(*p) || *p == '.' || *p == '-' || *p == '+' || *p == '*') ++p;
+
+      switch(*p) {
+        case 'd':
+        case 'i': {
+          int64_t i = 0;
+          JS_ToInt64(ctx, &i, argv[i]);
+          output[i] = (void*)(intptr_t)i;
+          break;
+        }
+        case 'o':
+        case 'x':
+        case 'u': {
+          uint32_t i = 0;
+          JS_ToUint32(ctx, &i, argv[i]);
+          output[i] = (void*)(uintptr_t)i;
+          break;
+        }
+        case 's': {
+          const char* str = JS_ToCString(ctx, argv[i]);
+          output[i] = (void*)str;
+          break;
+        }
+      }
+      ++i;
+    }
+  }
+  // JS_FreeCString(ctx, fmt);
+}
+
+#include "quickjs-imgui-style.hpp"
+
 enum {
   IMGUI_INIT,
   IMGUI_CREATE_CONTEXT,
@@ -347,211 +550,7 @@ enum {
   IMGUI_MEM_ALLOC,
   IMGUI_MEM_FREE,
   IMGUI_POINTER,
-
 };
-
-static void
-js_imgui_init_gl(GLFWwindow* window) {
-  if(!imgui_is_initialized) {
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
-
-    // Decide GL+GLSL versions
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-    // GL ES 2.0 + GLSL 100
-    const char* glsl_version = "#version 100"
-#elif defined(__APPLE__)
-    // GL 3.2 + GLSL 150
-    const char* glsl_version = "#version 150";
-#else
-    // GL 3.0 + GLSL 130
-    const char* glsl_version = "#version 130";
-#endif
-
-        IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
-  }
-
-  imgui_is_initialized = true;
-}
-
-static void
-js_imgui_free_func(JSRuntime* rt, void* opaque, void* ptr) {
-  ImGui::MemFree(ptr);
-}
-
-static ImVec2
-js_imgui_getimvec2(JSContext* ctx, JSValueConst value) {
-  JSValue xval = JS_UNDEFINED, yval = JS_UNDEFINED;
-  double x, y;
-  if(JS_IsArray(ctx, value)) {
-    xval = JS_GetPropertyUint32(ctx, value, 0);
-    yval = JS_GetPropertyUint32(ctx, value, 1);
-  } else if(JS_IsObject(value)) {
-    xval = JS_GetPropertyStr(ctx, value, "x");
-    yval = JS_GetPropertyStr(ctx, value, "y");
-  }
-  JS_ToFloat64(ctx, &x, xval);
-  JS_ToFloat64(ctx, &y, yval);
-  return ImVec2(x, y);
-}
-
-static ImVec4
-js_imgui_getimvec4(JSContext* ctx, JSValueConst value) {
-  JSValue xval = JS_UNDEFINED, yval = JS_UNDEFINED, zval = JS_UNDEFINED, wval = JS_UNDEFINED;
-  double x, y, z, w;
-  if(JS_IsArray(ctx, value)) {
-    xval = JS_GetPropertyUint32(ctx, value, 0);
-    yval = JS_GetPropertyUint32(ctx, value, 1);
-    zval = JS_GetPropertyUint32(ctx, value, 2);
-    wval = JS_GetPropertyUint32(ctx, value, 3);
-  } else if(JS_IsObject(value)) {
-    xval = JS_GetPropertyStr(ctx, value, "x");
-    yval = JS_GetPropertyStr(ctx, value, "y");
-    zval = JS_GetPropertyStr(ctx, value, "z");
-    wval = JS_GetPropertyStr(ctx, value, "w");
-  }
-  JS_ToFloat64(ctx, &x, xval);
-  JS_ToFloat64(ctx, &y, yval);
-  JS_ToFloat64(ctx, &x, zval);
-  JS_ToFloat64(ctx, &y, wval);
-  return ImVec4(x, y, z, w);
-}
-
-static ImVec4
-js_imgui_getcolor(JSContext* ctx, JSValueConst value) {
-  ImVec4 vec = {0, 0, 0, 0};
-  if(JS_IsObject(value)) {
-    vec = js_imgui_getimvec4(ctx, value);
-  } else if(JS_IsNumber(value)) {
-    uint32_t color = 0;
-    JS_ToUint32(ctx, &color, value);
-    vec = ImGui::ColorConvertU32ToFloat4(color);
-  } else if(JS_IsString(value)) {
-    const char *p, *str = JS_ToCString(ctx, value);
-    uint32_t color;
-    for(p = str; *p; p++)
-      if(isxdigit(*p))
-        break;
-    color = strtoul(p, 0, 16);
-    vec = ImGui::ColorConvertU32ToFloat4(color);
-    JS_FreeCString(ctx, str);
-  }
-  return vec;
-}
-
-static JSValue
-js_imgui_newptr(JSContext* ctx, void* ptr) {
-  char buf[128];
-  snprintf(buf, sizeof(buf), "%p", ptr);
-  return JS_NewString(ctx, buf);
-}
-
-template<class T>
-static T*
-js_imgui_getptr(JSContext* ctx, JSValueConst value) {
-  const char* str = JS_ToCString(ctx, value);
-  void* ptr = 0;
-  sscanf(str, "%p", &ptr);
-  JS_FreeCString(ctx, str);
-  return static_cast<T*>(ptr);
-}
-
-static ImTextureID
-js_imgui_gettexture(JSContext* ctx, JSValueConst value) {
-  if(JS_IsNumber(value)) {
-    uint64_t id;
-    JS_ToIndex(ctx, &id, value);
-    return ImTextureID(id);
-  }
-
-  return js_imgui_getptr<void>(ctx, value);
-}
-
-static JSValue
-js_imgui_newimvec2(JSContext* ctx, const ImVec2& vec) {
-  JSValue ret = JS_NewArray(ctx);
-  JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, vec.x));
-  JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, vec.y));
-  return ret;
-}
-
-static JSValue
-js_imgui_newimvec4(JSContext* ctx, const ImVec4& vec) {
-  JSValue ret = JS_NewArray(ctx);
-  JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, vec.x));
-  JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, vec.y));
-  JS_SetPropertyUint32(ctx, ret, 2, JS_NewFloat64(ctx, vec.z));
-  JS_SetPropertyUint32(ctx, ret, 3, JS_NewFloat64(ctx, vec.w));
-  return ret;
-}
-
-static int
-js_imgui_formatcount(JSContext* ctx, int argc, JSValueConst argv[]) {
-  const char *p, *end, *fmt;
-  int i = 0;
-  fmt = JS_ToCString(ctx, argv[i++]);
-  end = fmt + strlen(fmt);
-  for(p = fmt; p < end; p++) {
-    if(*p == '%' && p[1] != '%') {
-      ++p;
-      while(isdigit(*p) || *p == '.' || *p == '-' || *p == '+' || *p == '*') ++p;
-      ++i;
-    }
-  }
-  JS_FreeCString(ctx, fmt);
-  return i;
-}
-
-static void
-js_imgui_formatargs(JSContext* ctx, int argc, JSValueConst argv[], void* output[]) {
-  const char *p, *end, *fmt;
-  int i = 0;
-
-  fmt = JS_ToCString(ctx, argv[i]);
-  end = fmt + strlen(fmt);
-
-  output[i++] = (void*)fmt;
-
-  for(p = fmt; p < end; p++) {
-    if(*p == '%' && p[1] != '%') {
-      ++p;
-
-      while(isdigit(*p) || *p == '.' || *p == '-' || *p == '+' || *p == '*') ++p;
-
-      switch(*p) {
-        case 'd':
-        case 'i': {
-          int64_t i = 0;
-          JS_ToInt64(ctx, &i, argv[i]);
-          output[i] = (void*)(intptr_t)i;
-          break;
-        }
-        case 'o':
-        case 'x':
-        case 'u': {
-          uint32_t i = 0;
-          JS_ToUint32(ctx, &i, argv[i]);
-          output[i] = (void*)(uintptr_t)i;
-          break;
-        }
-        case 's': {
-          const char* str = JS_ToCString(ctx, argv[i]);
-          output[i] = (void*)str;
-          break;
-        }
-      }
-      ++i;
-    }
-  }
-  // JS_FreeCString(ctx, fmt);
-}
-
-#include "quickjs-imgui-style.hpp"
 
 static JSValue
 js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
@@ -1331,7 +1330,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       int32_t flags = 0;
       if(argc >= 3)
         JS_ToInt32(ctx, &flags, argv[2]);
-      ImGui::BeginCombo(label, preview_value, flags);
+      ret = JS_NewBool(ctx, ImGui::BeginCombo(label, preview_value, flags));
       JS_FreeCString(ctx, label);
       JS_FreeCString(ctx, preview_value);
       break;
@@ -1448,7 +1447,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       if(argc >= 3)
         JS_ToInt32(ctx, &flags, argv[2]);
 
-      ImGui::CollapsingHeader(label, p_visible, flags);
+      ret = JS_NewBool(ctx, ImGui::CollapsingHeader(label, p_visible, flags));
       JS_FreeCString(ctx, label);
       break;
     }
@@ -1468,7 +1467,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         JS_ToInt32(ctx, &flags, argv[2]);
       if(argc >= 4)
         size = js_imgui_getimvec2(ctx, argv[3]);
-      ImGui::Selectable(label, selected, flags, size);
+      ret = JS_NewBool(ctx, ImGui::Selectable(label, selected, flags, size));
       JS_FreeCString(ctx, label);
       break;
     }
@@ -1477,7 +1476,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       ImVec2 size(0, 0);
       if(argc >= 2)
         size = js_imgui_getimvec2(ctx, argv[1]);
-      ImGui::BeginListBox(label, size);
+      ret = JS_NewBool(ctx, ImGui::BeginListBox(label, size));
       JS_FreeCString(ctx, label);
       break;
     }
@@ -1619,7 +1618,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         str_id = JS_ToCString(ctx, argv[0]);
       if(argc >= 2)
         JS_ToInt32(ctx, &flags, argv[1]);
-      ImGui::BeginPopupContextItem(str_id, flags);
+      ret = JS_NewBool(ctx, ImGui::BeginPopupContextItem(str_id, flags));
       if(str_id)
         JS_FreeCString(ctx, str_id);
       break;
@@ -1631,7 +1630,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         str_id = JS_ToCString(ctx, argv[0]);
       if(argc >= 2)
         JS_ToInt32(ctx, &flags, argv[1]);
-      ImGui::BeginPopupContextWindow(str_id, flags);
+      ret = JS_NewBool(ctx, ImGui::BeginPopupContextWindow(str_id, flags));
       if(str_id)
         JS_FreeCString(ctx, str_id);
       break;
@@ -1643,7 +1642,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         str_id = JS_ToCString(ctx, argv[0]);
       if(argc >= 2)
         JS_ToInt32(ctx, &flags, argv[1]);
-      ImGui::BeginPopupContextVoid(str_id, flags);
+      ret = JS_NewBool(ctx, ImGui::BeginPopupContextVoid(str_id, flags));
       if(str_id)
         JS_FreeCString(ctx, str_id);
       break;
@@ -1670,7 +1669,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       int32_t flags = 0;
       if(argc >= 2)
         JS_ToInt32(ctx, &flags, argv[1]);
-      ImGui::IsPopupOpen(str_id, flags);
+      ret = JS_NewBool(ctx, ImGui::IsPopupOpen(str_id, flags));
       JS_FreeCString(ctx, str_id);
       break;
     }
@@ -2250,7 +2249,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       bool clip = true;
       if(argc >= 3)
         clip = JS_ToBool(ctx, argv[2]);
-      ImGui::IsMouseHoveringRect(r_min, r_max, clip);
+      ret = JS_NewBool(ctx, ImGui::IsMouseHoveringRect(r_min, r_max, clip));
       break;
     }
     case IMGUI_IS_MOUSE_POS_VALID: {
