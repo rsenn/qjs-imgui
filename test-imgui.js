@@ -1,16 +1,28 @@
 import * as ImGui from 'imgui';
 import * as glfw from 'glfw';
 
-Object.assign(globalThis, { ImGui, glfw });
+let window, nvg;
 
-let window;
+import('nanovg').then(m => (nvg = m));
+
+export function Clear(color = nvg.RGB(0, 0, 0)) {
+  const { size } = window;
+
+  nvg.Save();
+  nvg.BeginPath();
+  nvg.Rect(0, 0, ...size);
+  nvg.FillColor(color);
+  nvg.Fill();
+  nvg.Restore();
+}
 
 let menuEnabled,
   floatValue = 0.5,
   intValue = 0,
   boolValue = true;
 
-  let checked = true;
+let running = true,
+  checked = true;
 
 // Note that shortcuts are currently provided for display only
 // (future version will add explicit flags to BeginMenu() to request processing shortcuts)
@@ -91,57 +103,81 @@ function ShowExampleMenuFile() {
     console.log('checked =', checked);
   }
   if(ImGui.MenuItem('Quit', 'Alt+F4')) {
+    running = false;
   }
 }
+
+let show_app_main_menu_bar,
+  show_app_console,
+  show_app_log,
+  show_app_layout,
+  show_app_property_editor,
+  show_app_long_text,
+  show_app_auto_resize,
+  show_app_constrained_resize,
+  show_app_simple_overlay,
+  show_app_fullscreen,
+  show_app_window_titles,
+  show_app_custom_rendering,
+  show_app_documents,
+  show_app_metrics,
+  show_app_style_editor,
+  show_app_about;
+// let show = {};
+
+let ptr = ImGui.Pointer(
+  () => show_app_main_menu_bar,
+  v => (show_app_main_menu_bar = v)
+);
+
+let ptr2 = ImGui.Pointer(false);
+
+let show_about_box = ImGui.Pointer(
+  () => show_app_about,
+  value => (show_app_about = value)
+);
+let show_demo_window = ImGui.Pointer(false);
+let show_light_bg = ImGui.Pointer(true);
+let slider_value = ImGui.Pointer(0);
 
 function main() {
   window = new glfw.Window(800, 600, 'ImGui test');
   //window ??= [1280,800];
 
   ImGui.Init(window);
+
+  nvg && nvg.CreateGL3(nvg.STENCIL_STROKES | nvg.ANTIALIAS | nvg.DEBUG);
+
   console.log('ImGui.WindowFlags.MenuBar', ImGui.WindowFlags.MenuBar);
 
-  while(!window.shouldClose) {
+  while(!window.shouldClose && running) {
     glfw.poll();
+
+    if(nvg) {
+      Clear(nvg.RGB(...(show_light_bg() ? [0xdd, 0xdd, 0xdd] : [0, 0, 0])));
+      nvg.BeginFrame(...window.size, 1);
+      nvg.EndFrame();
+    }
 
     ImGui.NewFrame();
     ImGui.Begin('This is a window', null, ImGui.WindowFlags.MenuBar);
     ImGui.PushItemWidth(ImGui.GetFontSize() * -12);
 
-    ImGui.Text('This is some useful text.');
-    ImGui.Button('Button');
-    let show_app_main_menu_bar,
-      show_app_console,
-      show_app_log,
-      show_app_layout,
-      show_app_property_editor,
-      show_app_long_text,
-      show_app_auto_resize,
-      show_app_constrained_resize,
-      show_app_simple_overlay,
-      show_app_fullscreen,
-      show_app_window_titles,
-      show_app_custom_rendering,
-      show_app_documents,
-      show_app_metrics,
-      show_app_style_editor,
-      show_app_about;
-    // let show = {};
+    ImGui.Text('This is some Text');
 
-    let ptr = ImGui.Pointer(
-      () => show_app_main_menu_bar,
-      v => (show_app_main_menu_bar = v)
-    );
+    ImGui.Checkbox('Show About', show_about_box);
+    ImGui.Checkbox('Show Demo Window', show_demo_window);
+    ImGui.Checkbox('Light Background', show_light_bg);
+    ImGui.SliderFloat('Slider', slider_value, 0, 300, "%3.0f", 0);
 
-    let ptr2 = ImGui.Pointer(false);
-    let show_demo_window = ImGui.Pointer(false);
 
-    /*console.log('ptr2()', ptr2());
-    console.log((ptr2(true), 'ptr2(true)'));
-    console.log('ptr2()', ptr2());
-    console.log((ptr2(false), 'ptr2(false)'));*/
+    //if(ImGui.Button(!show_light_bg() ? 'Light' : 'Dark')) show_light_bg(!show_light_bg());
+    //if(ImGui.Button((!show_about_box() ? 'Show' : 'Hide') + ' about')) show_about_box(!show_about_box());
+    //if(ImGui.Button((!show_demo_window() ? 'Show' : 'Hide') + ' demo')) show_demo_window(!show_demo_window());
 
-    ImGui.ShowDemoWindow(show_demo_window);
+    if(show_about_box()) ImGui.ShowAboutWindow(show_about_box);
+
+    if(show_demo_window()) ImGui.ShowDemoWindow(show_demo_window);
 
     // Menu Bar
     if(ImGui.BeginMenuBar()) {

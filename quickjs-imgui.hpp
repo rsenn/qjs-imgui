@@ -3,6 +3,7 @@
 
 #include <string>
 #include <iostream>
+#include <array>
 
 struct imgui;
 
@@ -32,12 +33,12 @@ extern "C" {
 
 extern "C" JSModuleDef* js_init_module_imgui(JSContext*, const char* module_name);
 
-template<typename T> class JSVal {
+template<typename T> struct JSVal {
   static T to(JSContext* ctx, JSValueConst jsval);
   static JSValue from(JSContext* ctx, T v);
 };
 
-template<> class JSVal<std::string> {
+template<> struct JSVal<std::string> {
   static std::string
   to(JSContext* ctx, JSValueConst jsval) {
     const char* s;
@@ -57,7 +58,7 @@ template<> class JSVal<std::string> {
   }
 };
 
-template<> class JSVal<const char*> {
+template<> struct JSVal<const char*> {
   static JSValue
   from(JSContext* ctx, const char* s) {
     return JS_NewString(ctx, s);
@@ -68,7 +69,7 @@ template<> class JSVal<const char*> {
   }
 };
 
-template<> class JSVal<double> {
+template<> struct JSVal<double> {
   static double
   to(JSContext* ctx, JSValueConst jsval) {
     double r;
@@ -82,7 +83,19 @@ template<> class JSVal<double> {
   }
 };
 
-template<> class JSVal<int64_t> {
+template<> struct JSVal<float> {
+  static float
+  to(JSContext* ctx, JSValueConst jsval) {
+    return JSVal<double>::to(ctx, jsval);
+  }
+
+  static JSValue
+  from(JSContext* ctx, float v) {
+    return JSVal<double>::from(ctx, v);
+  }
+};
+
+template<> struct JSVal<int64_t> {
   static int64_t
   to(JSContext* ctx, JSValueConst jsval) {
     int64_t r;
@@ -96,7 +109,7 @@ template<> class JSVal<int64_t> {
   }
 };
 
-template<> class JSVal<int32_t> {
+template<> struct JSVal<int32_t> {
   static int32_t
   to(JSContext* ctx, JSValueConst jsval) {
     int32_t r;
@@ -110,7 +123,7 @@ template<> class JSVal<int32_t> {
   }
 };
 
-template<> class JSVal<uint32_t> {
+template<> struct JSVal<uint32_t> {
   static uint32_t
   to(JSContext* ctx, JSValueConst jsval) {
     uint32_t r;
@@ -124,8 +137,7 @@ template<> class JSVal<uint32_t> {
   }
 };
 
-template<> class JSVal<bool> {
-public:
+template<> struct JSVal<bool> {
   static bool
   to(JSContext* ctx, JSValueConst jsval) {
     return JS_ToBool(ctx, jsval);
@@ -134,6 +146,26 @@ public:
   static JSValue
   from(JSContext* ctx, bool v) {
     return JS_NewBool(ctx, v);
+  }
+};
+
+template<typename T, size_t N> struct JSVal<std::array<T, N>> {
+  static std::array<T, N>
+  to(JSContext* ctx, JSValueConst jsval) {
+    std::array<T, N> ret;
+    for(size_t i = 0; i < N; ++i) {
+      JSValue prop = JS_GetPropertyUint32(ctx, ret, i);
+      ret[i] = JSVal<T>::to(ctx, jsval);
+      JS_FreeValue(ctx, prop);
+    }
+    return ret;
+  }
+
+  static JSValue
+  from(JSContext* ctx, std::array<float, N> v) {
+    JSValue ret = JS_NewArray(ctx);
+    for(size_t i = 0; i < N; ++i) JS_SetPropertyUint32(ctx, ret, i, JSVal<T>::from(ctx, v[i]));
+    return ret;
   }
 };
 

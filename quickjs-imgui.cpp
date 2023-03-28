@@ -633,9 +633,21 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       ImGui_ImplOpenGL3_RenderDrawData(data);
       break;
     };
-    case IMGUI_SHOW_DEMO_WINDOW: break;
-    case IMGUI_SHOW_ABOUT_WINDOW: break;
-    case IMGUI_SHOW_METRICS_WINDOW: break;
+    case IMGUI_SHOW_DEMO_WINDOW: {
+      OutputArg<bool> p_open(ctx, argc > 0 ? argv[0] : JS_NULL);
+      ImGui::ShowAboutWindow(p_open);
+      break;
+    }
+    case IMGUI_SHOW_ABOUT_WINDOW: {
+      OutputArg<bool> p_open(ctx, argc > 0 ? argv[0] : JS_NULL);
+      ImGui::ShowAboutWindow(p_open);
+      break;
+    }
+    case IMGUI_SHOW_METRICS_WINDOW: {
+      OutputArg<bool> p_open(ctx, argc > 0 ? argv[0] : JS_NULL);
+      ImGui::ShowMetricsWindow(p_open);
+      break;
+    }
     case IMGUI_SHOW_STYLE_EDITOR: {
       ImGuiStyle* style = js_imgui_style_data2(ctx, argv[0]);
       ImGui::ShowStyleEditor(style);
@@ -1298,8 +1310,28 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       ret = JS_NewBool(ctx, ImGui::ImageButton(tex, size, uv0, uv1, frame_padding, tint_col, border_col));
       break;
     }
-    case IMGUI_CHECKBOX: break;
-    case IMGUI_CHECKBOX_FLAGS: break;
+    case IMGUI_CHECKBOX: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      OutputArg<bool> p_checked(ctx, argc > 1 ? argv[1] : JS_NULL);
+
+      ret = JS_NewBool(ctx, ImGui::Checkbox(label, p_checked));
+      break;
+    }
+    case IMGUI_CHECKBOX_FLAGS: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      int64_t flags_value;
+      JS_ToInt64(ctx, &flags_value, argv[2]);
+
+      if(flags_value < 0) {
+        OutputArg<int> p_flags(ctx, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::CheckboxFlags(label, static_cast<int*>(p_flags), static_cast<int>(flags_value)));
+      } else {
+        OutputArg<unsigned int> p_flags(ctx, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::CheckboxFlags(label, static_cast<unsigned int*>(p_flags), static_cast<unsigned int>(flags_value)));
+      }
+
+      break;
+    }
     case IMGUI_RADIO_BUTTON: {
       const char* label = JS_ToCString(ctx, argv[0]);
       bool active = JS_ToBool(ctx, argv[1]);
@@ -1352,7 +1384,26 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     case IMGUI_DRAG_INT_RANGE2: break;
     case IMGUI_DRAG_SCALAR: break;
     case IMGUI_DRAG_SCALAR_N: break;
-    case IMGUI_SLIDER_FLOAT: break;
+    case IMGUI_SLIDER_FLOAT: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      OutputArg<float> p_value(ctx, argv[1]);
+      double vmin = 0, vmax = 1;
+      const char* format = 0;
+      int32_t flags = 0;
+
+      JS_ToFloat64(ctx, &vmin, argv[2]);
+      JS_ToFloat64(ctx, &vmax, argv[3]);
+      if(argc > 4)
+        format = JS_ToCString(ctx, argv[4]);
+      if(argc > 5)
+        JS_ToInt32(ctx, &flags, argv[5]);
+
+      ret = JS_NewBool(ctx, ImGui::SliderFloat(label, p_value, vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
+
+      if(format)
+        JS_FreeCString(ctx, format);
+      break;
+    }
     case IMGUI_SLIDER_FLOAT2: break;
     case IMGUI_SLIDER_FLOAT3: break;
     case IMGUI_SLIDER_FLOAT4: break;
