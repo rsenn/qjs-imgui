@@ -139,8 +139,10 @@ let show_about_box = ImGui.Pointer(
 let show_demo_window = ImGui.Pointer(false);
 let show_light_bg = ImGui.Pointer(true);
 let slider_value = ImGui.Pointer(0);
-let text_buf =new ArrayBuffer(4096);
+let text_buf = new ArrayBuffer(4096);
+let text_buf2 = new ArrayBuffer(4096 * 16);
 let slider2_value = [0, 0];
+let float_value =  ImGui.Pointer(0.0);
 
 function main() {
   window = new glfw.Window(800, 600, 'ImGui test');
@@ -162,7 +164,10 @@ function main() {
     }
 
     ImGui.NewFrame();
+
     ImGui.Begin('This is a window', null, ImGui.WindowFlags.MenuBar);
+
+    ImGui.SetWindowSize([400, 300]);
     ImGui.PushItemWidth(ImGui.GetFontSize() * -12);
 
     ImGui.Text('This is some Text');
@@ -174,10 +179,22 @@ function main() {
     ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
     ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
 
- 
-ImGui.InputText('Text',  text_buf, text_buf.byteLength, ImGui.InputTextFlags.CallbackAlways, data => {
-  console.log('InputText event', data);
-});
+    ImGui.InputTextMultiline(
+      'Text',
+      text_buf2,
+      text_buf2.byteLength,
+      [100, 30],
+      ImGui.InputTextFlags.CallbackAlways,
+      data => console.log('InputTextMultiline event', data)
+    );
+    ImGui.InputFloat('Float', float_value, 1, 10,  null,ImGui.InputTextFlags.CallbackAlways, data =>
+      console.log('InputFloat event', data)
+    );
+    false &&
+      ImGui.InputText('Text', text_buf, text_buf.byteLength, ImGui.InputTextFlags.CallbackAlways, data => {
+        /* prettier-ignore */ const {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection } = data;
+        /* prettier-ignore */ console.log('InputText event', {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection });
+      });
 
     //if(ImGui.Button(!show_light_bg() ? 'Light' : 'Dark')) show_light_bg(!show_light_bg());
     //if(ImGui.Button((!show_about_box() ? 'Show' : 'Hide') + ' about')) show_about_box(!show_about_box());

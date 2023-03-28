@@ -14,6 +14,7 @@
 #include "quickjs-imgui-pointer.hpp"
 #include "quickjs-imfont.hpp"
 #include "quickjs-imfontatlas.hpp"
+#include "quickjs-imgui-inputtextcallbackdata.hpp"
 
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui/backends/imgui_impl_glfw.h"
@@ -221,32 +222,30 @@ js_imgui_formatargs(JSContext* ctx, int argc, JSValueConst argv[], void* output[
   // JS_FreeCString(ctx, fmt);
 }
 
-struct InputTextUserData {
-  JSContext* ctx;
-  JSValue fn, buf;
-};
-
 int
 js_imgui_input_text_callback(ImGuiInputTextCallbackData* data) {
   InputTextUserData* user_data = static_cast<InputTextUserData*>(data->UserData);
   JSContext* ctx = user_data->ctx;
-  JSValue obj = JS_NewObject(ctx);
-  
-  JS_SetPropertyStr(ctx, obj, "EventFlag", JS_NewInt32(ctx, data->EventFlag));
-  JS_SetPropertyStr(ctx, obj, "Flags", JS_NewInt32(ctx, data->Flags));
-  JS_SetPropertyStr(ctx, obj, "EventChar", JS_NewUint32(ctx, data->EventChar));
-  JS_SetPropertyStr(ctx, obj, "EventKey", JS_NewUint32(ctx, data->EventKey));
-  JS_SetPropertyStr(ctx, obj, "Buf", JS_DupValue(ctx, user_data->buf));
-  JS_SetPropertyStr(ctx, obj, "BufTextLen", JS_NewInt32(ctx, data->BufTextLen));
-  JS_SetPropertyStr(ctx, obj, "BufSize", JS_NewUint32(ctx, data->BufSize));
-  JS_SetPropertyStr(ctx, obj, "BufDirty", JS_NewBool(ctx, data->BufDirty));
-  JS_SetPropertyStr(ctx, obj, "CursorPos", JS_NewInt32(ctx, data->CursorPos));
-  JS_SetPropertyStr(ctx, obj, "SelectionStart", JS_NewInt32(ctx, data->SelectionStart));
-  JS_SetPropertyStr(ctx, obj, "SelectionEnd", JS_NewInt32(ctx, data->SelectionEnd));
+  JSValue obj = JS_NewObjectProtoClass(ctx, imgui_inputtextcallbackdata_proto, js_imgui_inputtextcallbackdata_class_id);
+
+  JS_SetOpaque(obj, data);
 
   JSValue ret = JS_Call(ctx, user_data->fn, JS_UNDEFINED, 1, &obj);
   JS_FreeValue(ctx, ret);
   return 0;
+}
+
+std::pair<ImGuiInputTextCallback, void*>
+js_imgui_input_text_args(JSContext* ctx, InputTextUserData& context, int argc, JSValueConst argv[]) {
+  ImGuiInputTextCallback cb = nullptr;
+  void* user_data = nullptr;
+
+  cb = &js_imgui_input_text_callback;
+  user_data = &context;
+  context.buf = argv[1];
+  context.fn = argv[4];
+
+  return std::make_pair(cb, user_data);
 }
 
 #include "quickjs-imgui-style.hpp"
@@ -1421,7 +1420,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
 
       JS_ToFloat64(ctx, &vmin, argv[2]);
       JS_ToFloat64(ctx, &vmax, argv[3]);
-      if(argc > 4)
+      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
         format = JS_ToCString(ctx, argv[4]);
       if(argc > 5)
         JS_ToInt32(ctx, &flags, argv[5]);
@@ -1441,7 +1440,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
 
       JS_ToFloat64(ctx, &vmin, argv[2]);
       JS_ToFloat64(ctx, &vmax, argv[3]);
-      if(argc > 4)
+      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
         format = JS_ToCString(ctx, argv[4]);
       if(argc > 5)
         JS_ToInt32(ctx, &flags, argv[5]);
@@ -1461,7 +1460,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
 
       JS_ToFloat64(ctx, &vmin, argv[2]);
       JS_ToFloat64(ctx, &vmax, argv[3]);
-      if(argc > 4)
+      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
         format = JS_ToCString(ctx, argv[4]);
       if(argc > 5)
         JS_ToInt32(ctx, &flags, argv[5]);
@@ -1481,7 +1480,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
 
       JS_ToFloat64(ctx, &vmin, argv[2]);
       JS_ToFloat64(ctx, &vmax, argv[3]);
-      if(argc > 4)
+      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
         format = JS_ToCString(ctx, argv[4]);
       if(argc > 5)
         JS_ToInt32(ctx, &flags, argv[5]);
@@ -1508,9 +1507,8 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       size_t size;
       uint8_t* buffer;
       int32_t flags = 0;
-      ImGuiInputTextCallback cb = nullptr;
-      void* user_data = nullptr;
-      InputTextUserData context = {ctx, JS_NULL};
+      std::pair<ImGuiInputTextCallback, void*> cb = {nullptr, nullptr};
+      InputTextUserData context = {ctx, argv[1]};
 
       if(!(buffer = JS_GetArrayBuffer(ctx, &size, argv[1]))) {
         ret = JS_ThrowTypeError(ctx, "argument 2 must be an ArrayBuffer");
@@ -1522,33 +1520,117 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         JS_ToUint32(ctx, &buf_size, argv[2]);
       if(argc > 3)
         JS_ToInt32(ctx, &flags, argv[3]);
+
       if(argc > 4) {
         if(!JS_IsFunction(ctx, argv[4])) {
           ret = JS_ThrowTypeError(ctx, "argument 5 must be a Function");
           break;
         }
-
-        cb = &js_imgui_input_text_callback;
-        user_data = &context;
-        context.buf = argv[1];
-        context.fn = argv[4];
+        cb = js_imgui_input_text_args(ctx, context, argc - 4, argv + 4);
       }
 
-      ret = JS_NewBool(ctx, ImGui::InputText(label, reinterpret_cast<char*>(buffer), buf_size, ImGuiInputTextFlags(flags), cb, user_data));
+      ret = JS_NewBool(ctx, ImGui::InputText(label, reinterpret_cast<char*>(buffer), buf_size, ImGuiInputTextFlags(flags), cb.first, cb.second));
 
       break;
     }
-    case IMGUI_INPUT_TEXT_MULTILINE: break;
+    case IMGUI_INPUT_TEXT_MULTILINE: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      uint32_t buf_size;
+      size_t len;
+      uint8_t* buffer;
+      int32_t flags = 0;
+      std::pair<ImGuiInputTextCallback, void*> cb = {nullptr, nullptr};
+      InputTextUserData context = {ctx, argv[1]};
+      ImVec2 size(0, 0);
+
+      if(!(buffer = JS_GetArrayBuffer(ctx, &len, argv[1]))) {
+        ret = JS_ThrowTypeError(ctx, "argument 2 must be an ArrayBuffer");
+        break;
+      }
+
+      buf_size = len;
+      if(argc > 2)
+        JS_ToUint32(ctx, &buf_size, argv[2]);
+
+      if(argc > 3)
+        size = js_imgui_getimvec2(ctx, argv[3]);
+
+      if(argc > 4)
+        JS_ToInt32(ctx, &flags, argv[4]);
+
+      if(argc > 5) {
+        if(!JS_IsFunction(ctx, argv[5])) {
+          ret = JS_ThrowTypeError(ctx, "argument 6 must be a Function");
+          break;
+        }
+        cb = js_imgui_input_text_args(ctx, context, argc - 5, argv + 5);
+      }
+
+      ret = JS_NewBool(ctx, ImGui::InputTextMultiline(label, reinterpret_cast<char*>(buffer), buf_size, size, ImGuiInputTextFlags(flags), cb.first, cb.second));
+      break;
+    }
     case IMGUI_INPUT_TEXT_WITH_HINT: break;
-    case IMGUI_INPUT_FLOAT: break;
+    case IMGUI_INPUT_FLOAT: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      OutputArg<float> p_value(ctx, argv[1]);
+      double step = 0, step_fast = 0;
+      const char* format = 0;
+      int32_t flags = 0;
+
+      JS_ToFloat64(ctx, &step, argv[2]);
+      JS_ToFloat64(ctx, &step_fast, argv[3]);
+      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+        format = JS_ToCString(ctx, argv[4]);
+      if(argc > 5)
+        JS_ToInt32(ctx, &flags, argv[5]);
+
+      ret = JS_NewBool(ctx, ImGui::InputFloat(label, p_value, step, step_fast, format ? format : "%.3f", ImGuiInputTextFlags(flags)));
+
+      if(format)
+        JS_FreeCString(ctx, format);
+      break;
+    }
     case IMGUI_INPUT_FLOAT2: break;
     case IMGUI_INPUT_FLOAT3: break;
     case IMGUI_INPUT_FLOAT4: break;
-    case IMGUI_INPUT_INT: break;
+    case IMGUI_INPUT_INT: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      OutputArg<int> p_value(ctx, argv[1]);
+      int32_t step = 0, step_fast = 0,flags = 0;
+ 
+      JS_ToInt32(ctx, &step, argv[2]);
+      JS_ToInt32(ctx, &step_fast, argv[3]);
+
+       if(argc > 4)
+        JS_ToInt32(ctx, &flags, argv[4]);
+
+      ret = JS_NewBool(ctx, ImGui::InputInt(label, p_value, step, step_fast, ImGuiInputTextFlags(flags)));
+      break;
+    }
     case IMGUI_INPUT_INT2: break;
     case IMGUI_INPUT_INT3: break;
     case IMGUI_INPUT_INT4: break;
-    case IMGUI_INPUT_DOUBLE: break;
+    case IMGUI_INPUT_DOUBLE: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      OutputArg<double> p_value(ctx, argv[1]);
+      double step = 0, step_fast = 0;
+      const char* format = 0;
+      int32_t flags = 0;
+
+      JS_ToFloat64(ctx, &step, argv[2]);
+      JS_ToFloat64(ctx, &step_fast, argv[3]);
+
+      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+        format = JS_ToCString(ctx, argv[4]);
+      if(argc > 5)
+        JS_ToInt32(ctx, &flags, argv[5]);
+
+      ret = JS_NewBool(ctx, ImGui::InputDouble(label, p_value, step, step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
+
+      if(format)
+        JS_FreeCString(ctx, format);
+      break;
+    }
     case IMGUI_INPUT_SCALAR: break;
     case IMGUI_INPUT_SCALAR_N: break;
     case IMGUI_COLOR_EDIT3: break;
