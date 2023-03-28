@@ -1398,7 +1398,19 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       ImGui::EndCombo();
       break;
     }
-    case IMGUI_COMBO: break;
+    case IMGUI_COMBO: {
+      const char* label = JS_ToCString(ctx, argv[0]);
+      OutputArg<int> p_value(ctx, argv[1]);
+      ItemsGetterUserData user_data = {ctx, argv[2]};
+      int32_t items_count = -1, popup_max_height_in_items = -1;
+      JS_ToInt32(ctx, &items_count, argv[3]);
+      if(argc > 4)
+        JS_ToInt32(ctx, &popup_max_height_in_items, argv[4]);
+
+      ret = JS_NewBool(ctx, ImGui::Combo(label,  p_value, js_items_getter, &user_data, items_count,popup_max_height_in_items));
+      JS_FreeCString(ctx, label);
+      break;
+    }
     case IMGUI_DRAG_FLOAT: break;
     case IMGUI_DRAG_FLOAT2: break;
     case IMGUI_DRAG_FLOAT3: break;
@@ -1635,21 +1647,21 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       const char* label = JS_ToCString(ctx, argv[0]);
       OutputArg<union ImGuiDataTypeUnion> p_value(ctx, argv[2]);
       const char* format = 0;
-      int32_t data_type = 0, flags = 0;
+      int32_t type = 0, flags = 0;
       union ImGuiDataTypeUnion scalar, step, step_fast;
 
-      JS_ToInt32(ctx, &data_type, argv[1]);
+      JS_ToInt32(ctx, &type, argv[1]);
 
-      js_to_scalar(ctx, p_value, argv[2], ImGuiDataType_(data_type));
-      js_to_scalar(ctx, &step, argv[3], ImGuiDataType_(data_type));
-      js_to_scalar(ctx, &step_fast, argv[4], ImGuiDataType_(data_type));
+      js_to_scalar(ctx, p_value, argv[2], type);
+      js_to_scalar(ctx, &step, argv[3], type);
+      js_to_scalar(ctx, &step_fast, argv[4], type);
 
       if(argc > 5 && !(JS_IsUndefined(argv[5]) || JS_IsNull(argv[5])))
         format = JS_ToCString(ctx, argv[5]);
       if(argc > 6)
         JS_ToInt32(ctx, &flags, argv[6]);
 
-      ret = JS_NewBool(ctx, ImGui::InputScalar(label, ImGuiDataType(data_type), static_cast<void*>(p_value), &step, &step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
+      ret = JS_NewBool(ctx, ImGui::InputScalar(label, type, static_cast<union ImGuiDataTypeUnion*>(p_value), &step, &step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
 
       if(format)
         JS_FreeCString(ctx, format);

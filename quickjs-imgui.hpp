@@ -34,6 +34,30 @@ extern "C" {
 
 extern "C" JSModuleDef* js_init_module_imgui(JSContext*, const char* module_name);
 
+struct ItemsGetterUserData {
+  JSContext* ctx;
+  JSValue fn;
+};
+
+typedef bool ItemsGetterFunction(void* data, int idx, const char** out_text);
+
+bool
+js_items_getter(void* data, int idx, const char** out_text) {
+  ItemsGetterUserData* user_data = static_cast<ItemsGetterUserData*>(data);
+  JSContext* ctx = user_data->ctx;
+  JSValue argv[] = {JS_NewInt32(ctx, idx)};
+  JSValue ret = JS_Call(ctx, user_data->fn, JS_UNDEFINED, countof(argv), argv);
+  const char* str;
+  bool result = false;
+  if((str = JS_ToCString(ctx, ret))) {
+    *out_text = str;
+    JS_FreeCString(ctx, str);
+    result = true;
+  }
+  JS_FreeValue(ctx, ret);
+  return result;
+}
+
 template<typename T> struct JSVal {
   static T to(JSContext* ctx, JSValueConst jsval);
   static JSValue from(JSContext* ctx, T v);
@@ -288,31 +312,111 @@ union ImGuiDataTypeUnion {
 };
 
 template<enum ImGuiDataType_ type> void set_scalar(union ImGuiDataTypeUnion& data, typename ScalarType<type>::value_type value);
-template<> void set_scalar<ImGuiDataType_S8>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S8>::value_type value) { data.s8 = value; }
-template<> void set_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U8>::value_type value) { data.u8 = value; }
-template<> void set_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S16>::value_type value) { data.s16 = value; }
-template<> void set_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U16>::value_type value) { data.u16 = value; }
-template<> void set_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S32>::value_type value) { data.s32 = value; }
-template<> void set_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U32>::value_type value) { data.u32 = value; }
-template<> void set_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S64>::value_type value) { data.s64 = value; }
-template<> void set_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U64>::value_type value) { data.u64 = value; }
-template<> void set_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_Float>::value_type value) { data.f32 = value; }
-template<> void set_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_Double>::value_type value) { data.f64 = value; }
+template<>
+void
+set_scalar<ImGuiDataType_S8>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S8>::value_type value) {
+  data.s8 = value;
+}
+template<>
+void
+set_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U8>::value_type value) {
+  data.u8 = value;
+}
+template<>
+void
+set_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S16>::value_type value) {
+  data.s16 = value;
+}
+template<>
+void
+set_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U16>::value_type value) {
+  data.u16 = value;
+}
+template<>
+void
+set_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S32>::value_type value) {
+  data.s32 = value;
+}
+template<>
+void
+set_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U32>::value_type value) {
+  data.u32 = value;
+}
+template<>
+void
+set_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S64>::value_type value) {
+  data.s64 = value;
+}
+template<>
+void
+set_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U64>::value_type value) {
+  data.u64 = value;
+}
+template<>
+void
+set_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_Float>::value_type value) {
+  data.f32 = value;
+}
+template<>
+void
+set_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_Double>::value_type value) {
+  data.f64 = value;
+}
 template<enum ImGuiDataType_ type> typename ScalarType<type>::value_type get_scalar(union ImGuiDataTypeUnion const& data);
-template<> ScalarType<ImGuiDataType_S8>::value_type get_scalar<ImGuiDataType_S8>(union ImGuiDataTypeUnion const& data) { return data.s8; }
-template<> ScalarType<ImGuiDataType_U8>::value_type get_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion const& data) { return data.u8; }
-template<> ScalarType<ImGuiDataType_S16>::value_type get_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion const& data) { return data.s16; }
-template<> ScalarType<ImGuiDataType_U16>::value_type get_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion const& data) { return data.u16; }
-template<> ScalarType<ImGuiDataType_S32>::value_type get_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion const& data) { return data.s32; }
-template<> ScalarType<ImGuiDataType_U32>::value_type get_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion const& data) { return data.u32; }
-template<> ScalarType<ImGuiDataType_S64>::value_type get_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion const& data) { return data.s64; }
-template<> ScalarType<ImGuiDataType_U64>::value_type get_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion const& data) { return data.u64; }
-template<> ScalarType<ImGuiDataType_Float>::value_type get_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion const& data) { return data.f32; }
-template<> ScalarType<ImGuiDataType_Double>::value_type get_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion const& data) { return data.f64; }
+template<>
+ScalarType<ImGuiDataType_S8>::value_type
+get_scalar<ImGuiDataType_S8>(union ImGuiDataTypeUnion const& data) {
+  return data.s8;
+}
+template<>
+ScalarType<ImGuiDataType_U8>::value_type
+get_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion const& data) {
+  return data.u8;
+}
+template<>
+ScalarType<ImGuiDataType_S16>::value_type
+get_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion const& data) {
+  return data.s16;
+}
+template<>
+ScalarType<ImGuiDataType_U16>::value_type
+get_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion const& data) {
+  return data.u16;
+}
+template<>
+ScalarType<ImGuiDataType_S32>::value_type
+get_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion const& data) {
+  return data.s32;
+}
+template<>
+ScalarType<ImGuiDataType_U32>::value_type
+get_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion const& data) {
+  return data.u32;
+}
+template<>
+ScalarType<ImGuiDataType_S64>::value_type
+get_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion const& data) {
+  return data.s64;
+}
+template<>
+ScalarType<ImGuiDataType_U64>::value_type
+get_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion const& data) {
+  return data.u64;
+}
+template<>
+ScalarType<ImGuiDataType_Float>::value_type
+get_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion const& data) {
+  return data.f32;
+}
+template<>
+ScalarType<ImGuiDataType_Double>::value_type
+get_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion const& data) {
+  return data.f64;
+}
 
 int
-js_to_scalar(JSContext* ctx, union ImGuiDataTypeUnion* data, JSValueConst value, enum ImGuiDataType_ type) {
-  switch(type) {
+js_to_scalar(JSContext* ctx, union ImGuiDataTypeUnion* data, JSValueConst value, ImGuiDataType type) {
+  switch(ImGuiDataType_(type)) {
     case ImGuiDataType_S8: {
       int32_t n;
       int ret = JS_ToInt32(ctx, &n, value);
@@ -362,8 +466,8 @@ js_to_scalar(JSContext* ctx, union ImGuiDataTypeUnion* data, JSValueConst value,
 }
 
 JSValue
-js_from_scalar(JSContext* ctx, union ImGuiDataTypeUnion const* data, enum ImGuiDataType_ type) {
-  switch(type) {
+js_from_scalar(JSContext* ctx, union ImGuiDataTypeUnion const* data, ImGuiDataType type) {
+  switch(ImGuiDataType_(type)) {
     case ImGuiDataType_S8: return JS_NewInt32(ctx, data->s8);
     case ImGuiDataType_U8: return JS_NewUint32(ctx, data->u8);
     case ImGuiDataType_S16: return JS_NewInt32(ctx, data->s16);
@@ -394,6 +498,5 @@ public:
   operator void*() { return ptr; }
   operator union ImGuiDataTypeUnion *() { return ptr; }
 };
-
 
 #endif /* defined(QUICKJS_IMGUI_HPP) */
