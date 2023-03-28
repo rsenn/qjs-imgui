@@ -235,7 +235,7 @@ public:
   operator T*() { return is_null ? nullptr : &value; }
 };
 
-template<typename T, size_t N> class OutputArg< std::array<T, N> > {
+template<typename T, size_t N> class OutputArg<std::array<T, N>> {
 public:
   bool is_null;
   std::array<T, N> value;
@@ -246,17 +246,17 @@ public:
     is_null = JS_IsNull(_arg) || JS_IsUndefined(_arg);
 
     if(!is_null) {
-       value = JSVal<std::array<T,N> >::to(ctx, _arg);
-     }
+      value = JSVal<std::array<T, N>>::to(ctx, _arg);
+    }
   }
 
   ~OutputArg() {
     if(!is_null) {
-       JSVal< std::array<T,N> >::from(ctx, value, param.param);
+      JSVal<std::array<T, N>>::from(ctx, value, param.param);
     }
   }
 
- // operator std::array<T,N>() { return is_null ? nullptr : &value; }
+  // operator std::array<T,N>() { return is_null ? nullptr : &value; }
   operator T*() { return is_null ? nullptr : value.data(); }
 };
 
