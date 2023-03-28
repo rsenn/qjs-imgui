@@ -174,21 +174,24 @@ public:
   JSContext* ctx;
 
   OutputArg(JSContext* _ctx, JSValueConst _arg) : param(_arg), ctx(_ctx) {
-    JSValue tmp = param.get(ctx);
-    is_null = JS_IsNull(tmp) || JS_IsUndefined(tmp);
+    is_null = JS_IsNull(_arg) || JS_IsUndefined(_arg);
 
-    if(!is_null)
+    if(!is_null) {
+      JSValue tmp = param.get(ctx);
       value = initially = JSVal<T>::to(ctx, tmp);
-
-    JS_FreeValue(ctx, tmp);
+      JS_FreeValue(ctx, tmp);
+    }
   }
 
   ~OutputArg() {
     if(!is_null) {
+      JSValue tmp = JSVal<T>::from(ctx, value);
+
       if(value != initially)
         std::cerr << "value (" << value << ") != initially (" << initially << ")" << std::endl;
 
-      param.set(ctx, JSVal<T>::from(ctx, value));
+      param.set(ctx, tmp);
+      JS_FreeValue(ctx, tmp);
     }
   }
 

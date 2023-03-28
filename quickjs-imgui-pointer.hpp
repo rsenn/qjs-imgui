@@ -13,9 +13,10 @@ thread_local JSValue imgui_pointer_proto = {JS_TAG_UNDEFINED};
 
 enum ImGuiPointerType {
   PROPERTY = 0,
-  CALL = 1,
-  INVOKE = 2,
-  GETSET = 3,
+  CALL ,
+  INVOKE ,
+  GETSET,
+  INTERNAL,
 };
 
 struct ImGuiPointerClosure {
@@ -46,7 +47,7 @@ js_imgui_pointer_finalizer(JSRuntime* rt, JSValue val) {
 }
 
 static JSValue
-js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv, int magic, void* opaque) {
+js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic, void* opaque) {
   ImGuiPointerClosure* ptr(static_cast<ImGuiPointerClosure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
@@ -55,12 +56,13 @@ js_imgui_pointer_set(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
     case INVOKE: ret = JS_Invoke(ctx, ptr->obj, ptr->prop, argc, argv); break;
     case PROPERTY: JS_SetProperty(ctx, ptr->obj, ptr->prop, JS_DupValue(ctx, argv[0])); break;
     case GETSET: ret = JS_Call(ctx, ptr->set, JS_UNDEFINED, argc, argv); break;
+    case INTERNAL: JS_FreeValue(ctx, ptr->obj);  ptr->obj = JS_DupValue(ctx, argv[0]); break;
   }
   return ret;
 }
 
 static JSValue
-js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv, int magic, void* opaque) {
+js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic, void* opaque) {
   ImGuiPointerClosure* ptr(static_cast<ImGuiPointerClosure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
@@ -69,16 +71,20 @@ js_imgui_pointer_get(JSContext* ctx, JSValueConst this_val, int argc, JSValueCon
     case INVOKE: ret = JS_Invoke(ctx, ptr->obj, ptr->prop, 0, 0); break;
     case PROPERTY: ret = JS_GetProperty(ctx, ptr->obj, ptr->prop); break;
     case GETSET: ret = JS_Call(ctx, ptr->get, JS_UNDEFINED, 0, 0); break;
+    case INTERNAL: ret = JS_DupValue(ctx, ptr->obj); break;
   }
   return ret;
 }
 
 static JSValue
-js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv, int magic, void* opaque) {
+js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic, void* opaque) {
   ImGuiPointerClosure* ptr(static_cast<ImGuiPointerClosure*>(opaque));
   JSValue ret = JS_UNDEFINED;
 
-  return (argc == 0 || JS_IsUndefined(argv[0])) ? js_imgui_pointer_get(ctx, this_val, argc, argv, magic, opaque) : js_imgui_pointer_set(ctx, this_val, argc, argv, magic, opaque);
+  if((argc == 0 || JS_IsUndefined(argv[0])))
+    return js_imgui_pointer_get(ctx, this_val, argc, argv, magic, opaque);
+
+  return js_imgui_pointer_set(ctx, this_val, argc, argv, magic, opaque);
 }
 
 static JSValue
@@ -103,7 +109,7 @@ js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst a
 
       ptr->magic = magic;
       ptr->obj = JS_DupValue(ctx, argv[0]);
-      ptr->type = is_function ? (argc >= 2 && !JS_IsUndefined(argv[1])) ? JS_IsFunction(ctx, argv[1]) ? GETSET : INVOKE : CALL : PROPERTY;
+      ptr->type = is_function ? (argc >= 2 && !JS_IsUndefined(argv[1])) ? JS_IsFunction(ctx, argv[1]) ? GETSET : INVOKE : CALL : argc > 0 ? PROPERTY : INTERNAL;
       ptr->prop = JS_ValueToAtom(ctx, argc >= 2 && !JS_IsFunction(ctx, argv[1]) ? argv[1] : JS_UNDEFINED);
       ptr->set = ptr->type == GETSET ? JS_DupValue(ctx, argv[1]) : JS_UNDEFINED;
 
@@ -132,6 +138,7 @@ js_imgui_pointer_call(JSContext* ctx, JSValueConst func_obj, JSValueConst this_v
     case POINTER_SET: ret = js_imgui_pointer_set(ctx, this_val, argc, argv, ptr->magic, ptr); break;
     default: ret = JS_ThrowInternalError(ctx, "%s: invalid magic %d", __func__, ptr->magic); break;
   }
+
   return ret;
 }
 
