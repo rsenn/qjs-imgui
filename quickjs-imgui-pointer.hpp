@@ -93,6 +93,12 @@ js_imgui_pointer_func(JSContext* ctx, JSValueConst this_val, int argc, JSValueCo
   return js_imgui_pointer_set(ctx, this_val, argc, argv, magic, opaque);
 }
 
+static inline ImGuiPointerClosure*
+imgui_pointer_dup(ImGuiPointerClosure*ptr) {
+  ++ptr->ref_count;
+  return ptr;
+}
+
 static JSValue
 js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int  magic) {
   JSValue ret = JS_UNDEFINED;
@@ -122,6 +128,7 @@ js_imgui_pointer(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst a
       else
         type = INTERNAL;
 
+      ptr->ref_count = 1;
       ptr->magic = magic;
       ptr->obj = JS_DupValue(ctx, argv[type == INVOKE ? 1 : 0]);
       ptr->type = type;
