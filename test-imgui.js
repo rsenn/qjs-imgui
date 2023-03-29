@@ -125,18 +125,23 @@ let show_app_main_menu_bar,
   show_app_about;
 // let show = {};
 
+const wrapGetSet = (gfn, fn) => [
+  gfn,
+  value => {
+    let old = gfn();
+    if(value !== old) {
+      fn(value);
+      console.log('value changed from', old, 'to', value);
+    }
+  }
+];
 
-
-const wrapGetSet = (gfn,fn) => [gfn,  value => {
-  let old=gfn();
-if(value !== old) {
-  fn(value);
-  console.log('value changed from',old,'to',value);
-}
-}];
-
-let ptr = ImGui.Pointer( ... wrapGetSet(() => show_app_main_menu_bar,
-  v => (show_app_main_menu_bar = v)));
+let ptr = ImGui.Pointer(
+  ...wrapGetSet(
+    () => show_app_main_menu_bar,
+    v => (show_app_main_menu_bar = v)
+  )
+);
 
 let ptr2 = ImGui.Pointer(false);
 
@@ -153,8 +158,13 @@ let slider2_value = [0, 0];
 let float_value = ImGui.Pointer(0.0);
 let scalar_value = new Float64Array([0]);
 
-let combo_index=1;
-let combo_value = ImGui.Pointer(...wrapGetSet(() => combo_index, value => combo_index=value));
+let combo_index = 1;
+let combo_value = ImGui.Pointer(
+  ...wrapGetSet(
+    () => combo_index,
+    value => (combo_index = value)
+  )
+);
 
 function main() {
   window = new glfw.Window(800, 600, 'ImGui test');
@@ -190,8 +200,8 @@ function main() {
     ImGui.SliderFloat('Slider', slider_value, 0, 300, '%3.0f', 0);
     ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
 
-    let items = ['beer', 'salad', 'pizza', 'pineapple']; 
-    
+    let items = ['beer', 'salad', 'pizza', 'pineapple'];
+
     ImGui.Combo('Combo', combo_value, idx => items[idx], items.length);
 
     //ImGui.InputScalar('Scalar', ImGui.DataType.Double, scalar_value, 1, 10, '%3.0f', ImGui.InputTextFlags.CallbackAlways);
