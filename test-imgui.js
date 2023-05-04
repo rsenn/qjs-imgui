@@ -3,8 +3,6 @@ import * as glfw from 'glfw';
 
 let window, nvg;
 
-import('nanovg').then(m => (nvg = m));
-
 export function Clear(color = nvg.RGB(0, 0, 0)) {
   const { size } = window;
 
@@ -172,7 +170,7 @@ function main() {
 
   ImGui.Init(window);
 
-  nvg && nvg.CreateGL3(nvg.STENCIL_STROKES | nvg.ANTIALIAS | nvg.DEBUG);
+  import('nanovg').then(m => ((nvg = m), nvg.CreateGL3(nvg.STENCIL_STROKES | nvg.ANTIALIAS | nvg.DEBUG)));
 
   console.log('ImGui.WindowFlags.MenuBar', ImGui.WindowFlags.MenuBar);
 

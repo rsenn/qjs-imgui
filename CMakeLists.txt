@@ -60,7 +60,7 @@ set(IMGUI_SOURCES
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends)
 
-option(IMGUI_DEMO "Build IMGUI demo" ON)
+option(IMGUI_DEMO "Build IMGUI demo" OFF)
 
 if(IMGUI_DEMO)
   add_executable(imgui_demo imgui/examples/example_glfw_opengl3/main.cpp
