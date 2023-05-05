@@ -110,53 +110,80 @@ js_tostring(JSContext* ctx, JSValueConst value) {
   return ret;
 }
 
+template<typename T>
 static inline BOOL
-js_has_property(JSContext* ctx, JSValueConst value, JSAtom prop) {
-  return JS_HasProperty(ctx, value, prop);
-}
-
-static inline BOOL
-js_has_property(JSContext* ctx, JSValueConst value, const std::string& name) {
+js_has_property(JSContext* ctx, JSValueConst value, const T& name) {
   JSAtom prop = js_atom(ctx, name);
   BOOL ret = JS_HasProperty(ctx, value, prop);
   JS_FreeAtom(ctx, prop);
   return ret;
 }
 
+template<>
+inline BOOL
+js_has_property<JSAtom>(JSContext* ctx, JSValueConst value, const JSAtom& prop) {
+  return JS_HasProperty(ctx, value, prop);
+}
+
+template<typename T>
 static inline JSValue
-js_get_property(JSContext* ctx, JSValueConst value, const std::string& name) {
+js_get_property(JSContext* ctx, JSValueConst value, const T& name) {
+  JSAtom prop = js_atom(ctx, name);
+  JSValue ret = JS_GetProperty(ctx, value, prop);
+  JS_FreeAtom(ctx, prop);
+  return ret;
+}
+
+template<>
+inline JSValue
+js_get_property<std::string>(JSContext* ctx, JSValueConst value, const std::string& name) {
   return JS_GetPropertyStr(ctx, value, name.c_str());
 }
 
-static inline JSValue
-js_get_property(JSContext* ctx, JSValueConst value, JSAtom prop) {
+template<>
+inline JSValue
+js_get_property<JSAtom>(JSContext* ctx, JSValueConst value, const JSAtom& prop) {
   return JS_GetProperty(ctx, value, prop);
 }
 
 template<class T>
-static inline JSValue
+inline JSValue
 js_get_property(JSContext* ctx, JSValueConst value, const std::vector<T>& list) {
   typename std::vector<T>::const_iterator it;
   JSValue ret = JS_UNDEFINED;
 
-  if(list.end() != (it = std::find_if(list.begin(), list.end(), std::bind(JS_HasProperty, ctx, value, std::placeholders::_1))))
+  if(list.end() != (it = std::find_if(list.begin(), list.end(), std::bind(js_has_property<T>, ctx, value, std::placeholders::_1))))
     ret = JS_GetProperty(ctx, value, *it);
 
   return ret;
 }
 
-static inline const char*
+template<class T, class Vector = std::vector<JSValue>>
+inline JSValue
+js_get_property(JSContext* ctx, const Vector& objs, const T& prop) {
+  typename std::vector<T>::const_iterator it;
+  JSValue ret = JS_UNDEFINED;
+
+  for(const auto& obj : objs) {
+    if(js_has_property(ctx, obj, prop))
+      return js_get_property(ctx, obj, prop);
+  }
+
+  return JS_UNDEFINED;
+}
+
+static inline std::string
 js_get_tostringtag(JSContext* ctx, JSValueConst obj) {
   JSAtom prop = js_symbol_static_atom(ctx, "toStringTag");
   JSValue value = JS_GetProperty(ctx, obj, prop);
   JS_FreeAtom(ctx, prop);
-  const char* ret = JS_ToCString(ctx, value);
+  std::string ret = js_tostring(ctx, value);
   JS_FreeValue(ctx, value);
   return ret;
 }
 
 static inline JSValue
-js_invoke(JSContext* ctx, JSValueConst obj, const char* method, int argc, JSValueConst argv[]) {
+js_invoke(JSContext* ctx, JSValueConst obj, const char* method, int argc = 0, JSValueConst argv[] = 0) {
   JSAtom prop = JS_NewAtom(ctx, method);
   JSValue ret = JS_Invoke(ctx, obj, prop, argc, argv);
   JS_FreeAtom(ctx, prop);
@@ -165,7 +192,7 @@ js_invoke(JSContext* ctx, JSValueConst obj, const char* method, int argc, JSValu
 
 template<class Vector>
 static inline JSValue
-js_invoke_all(JSContext* ctx, const Vector& objs, const char* method, int argc, JSValueConst argv[]) {
+js_invoke_all(JSContext* ctx, const Vector& objs, const char* method, int argc = 0, JSValueConst argv[] = 0) {
   JSAtom prop = JS_NewAtom(ctx, method);
   JSValue ret = JS_UNDEFINED;
 
