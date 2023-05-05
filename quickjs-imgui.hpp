@@ -6,6 +6,10 @@
 #include <array>
 //#include <variant>
 
+#include <vector>
+#include <algorithm>
+#include <functional>
+
 struct imgui;
 
 #include <quickjs.h>
@@ -56,6 +60,124 @@ js_items_getter(void* data, int idx, const char** out_text) {
   }
   JS_FreeValue(ctx, ret);
   return result;
+}
+
+static inline JSValue
+js_global_get_str(JSContext* ctx, const char* prop) {
+  JSValue global_obj, ret;
+  global_obj = JS_GetGlobalObject(ctx);
+  ret = JS_GetPropertyStr(ctx, global_obj, prop);
+  JS_FreeValue(ctx, global_obj);
+  return ret;
+}
+
+static inline JSValue
+js_symbol_ctor(JSContext* ctx) {
+  return js_global_get_str(ctx, "Symbol");
+}
+
+static inline JSValue
+js_symbol_static_value(JSContext* ctx, const char* name) {
+  JSValue symbol_ctor, ret;
+  symbol_ctor = js_symbol_ctor(ctx);
+  ret = JS_GetPropertyStr(ctx, symbol_ctor, name);
+  JS_FreeValue(ctx, symbol_ctor);
+  return ret;
+}
+
+static inline JSAtom
+js_symbol_static_atom(JSContext* ctx, const char* name) {
+  JSValue sym = js_symbol_static_value(ctx, name);
+  JSAtom ret = JS_ValueToAtom(ctx, sym);
+  JS_FreeValue(ctx, sym);
+  return ret;
+}
+
+static inline JSAtom
+js_atom(JSContext* ctx, const std::string& str) {
+  return JS_NewAtom(ctx, str.c_str());
+}
+
+static inline std::string
+js_tostring(JSContext* ctx, JSValueConst value) {
+  const char* s;
+  std::string ret;
+
+  if((s = JS_ToCString(ctx, value))) {
+    ret = s;
+    JS_FreeCString(ctx, s);
+  }
+  return ret;
+}
+
+static inline BOOL
+js_has_property(JSContext* ctx, JSValueConst value, JSAtom prop) {
+  return JS_HasProperty(ctx, value, prop);
+}
+
+static inline BOOL
+js_has_property(JSContext* ctx, JSValueConst value, const std::string& name) {
+  JSAtom prop = js_atom(ctx, name);
+  BOOL ret = JS_HasProperty(ctx, value, prop);
+  JS_FreeAtom(ctx, prop);
+  return ret;
+}
+
+static inline JSValue
+js_get_property(JSContext* ctx, JSValueConst value, const std::string& name) {
+  return JS_GetPropertyStr(ctx, value, name.c_str());
+}
+
+static inline JSValue
+js_get_property(JSContext* ctx, JSValueConst value, JSAtom prop) {
+  return JS_GetProperty(ctx, value, prop);
+}
+
+template<class T>
+static inline JSValue
+js_get_property(JSContext* ctx, JSValueConst value, const std::vector<T>& list) {
+  typename std::vector<T>::const_iterator it;
+  JSValue ret = JS_UNDEFINED;
+
+  if(list.end() != (it = std::find_if(list.begin(), list.end(), std::bind(JS_HasProperty, ctx, value, std::placeholders::_1))))
+    ret = JS_GetProperty(ctx, value, *it);
+
+  return ret;
+}
+
+static inline const char*
+js_get_tostringtag(JSContext* ctx, JSValueConst obj) {
+  JSAtom prop = js_symbol_static_atom(ctx, "toStringTag");
+  JSValue value = JS_GetProperty(ctx, obj, prop);
+  JS_FreeAtom(ctx, prop);
+  const char* ret = JS_ToCString(ctx, value);
+  JS_FreeValue(ctx, value);
+  return ret;
+}
+
+static inline JSValue
+js_invoke(JSContext* ctx, JSValueConst obj, const char* method, int argc, JSValueConst argv[]) {
+  JSAtom prop = JS_NewAtom(ctx, method);
+  JSValue ret = JS_Invoke(ctx, obj, prop, argc, argv);
+  JS_FreeAtom(ctx, prop);
+  return ret;
+}
+
+template<class Vector>
+static inline JSValue
+js_invoke_all(JSContext* ctx, const Vector& objs, const char* method, int argc, JSValueConst argv[]) {
+  JSAtom prop = JS_NewAtom(ctx, method);
+  JSValue ret = JS_UNDEFINED;
+
+  for(const auto& obj : objs) {
+    ret = JS_Invoke(ctx, obj, prop, argc, argv);
+
+    if(JS_IsException(ret))
+      break;
+  }
+
+  JS_FreeAtom(ctx, prop);
+  return ret;
 }
 
 template<typename T> struct JSVal {

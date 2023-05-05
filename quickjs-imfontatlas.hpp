@@ -33,6 +33,11 @@ enum {
 };
 
 static inline ImFontAtlas*
+js_imfontatlas_data(JSValueConst value) {
+  return static_cast<ImFontAtlas*>(JS_GetOpaque(value, js_imfontatlas_class_id));
+}
+
+static inline ImFontAtlas*
 js_imfontatlas_data2(JSContext* ctx, JSValueConst value) {
   return static_cast<ImFontAtlas*>(JS_GetOpaque2(ctx, value, js_imfontatlas_class_id));
 }

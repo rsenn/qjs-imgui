@@ -12,6 +12,7 @@
 #include <cctype>
 #include <GLFW/glfw3.h>
 
+#include "quickjs-imconfig.hpp"
 #include "quickjs-imgui.hpp"
 #include "quickjs-imgui-constants.hpp"
 #include "quickjs-imgui-payload.hpp"
@@ -24,6 +25,14 @@
 #include "imgui/backends/imgui_impl_opengl2.h"
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui/backends/imgui_impl_glfw.h"
+
+static JSClassDef js_imgui_impl_class = {
+    .class_name = "ImGuiImpl",
+};
+
+static JSClassID js_imgui_impl_class_id;
+static std::vector<JSValue> imgui_implementations;
+static std::vector<JSAtom> impl_init_methods = {};
 
 static bool imgui_is_initialized;
 static const char* glsl_version = 0;
@@ -601,2093 +610,2144 @@ enum {
   IMGUI_POINTER,
 };
 
+static std::string
+imgui_impl_type(const std::string& str) {
+  std::string::size_type pos, pos2;
+
+  pos = str.find("Impl");
+  const auto start = str.begin() + (pos == std::string::npos ? 0 : pos + 4);
+
+  pos2 = str.find_first_of("0123456789");
+  const auto end = pos2 == std::string::npos ? str.end() : str.begin() + pos2;
+
+  return std::string(start, end);
+}
+
 static JSValue
 js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
   JSValue ret = JS_UNDEFINED;
 
-  switch(magic) {
-    case IMGUI_INIT: {
-      GLFWwindow* window = 0;
-      if(argc > 0) {
-        if(JS_IsArray(ctx, argv[0])) {
-          ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
+  try {
 
-          window = glfwCreateWindow(size.x, size.y, "ImGui", NULL, NULL);
-        } else {
-          window = js_imgui_getobj<GLFWwindow>(ctx, argv[0]);
+    switch(magic) {
+      case IMGUI_INIT: {
+
+        for(int i = 0; i < argc; ++i) {
+          JSValue obj = JS_DupValue(ctx, argv[i]);
+
+          imgui_implementations.push_back(obj);
+
+          std::string class_name = js_get_tostringtag(ctx, obj);
+
+          // std::cout << "class_name: " << imgui_impl_type(class_name) << std::endl;
+
+          impl_init_methods.push_back(js_atom(ctx, std::string("InitFor") + imgui_impl_type(class_name)));
         }
+
+        if(impl_init_methods.empty())
+          impl_init_methods.push_back(js_atom(ctx, "InitForOther"));
+
+        impl_init_methods.push_back(js_atom(ctx, "Init"));
+
+        /* GLFWwindow* window = 0;
+         if(argc > 0) {
+           if(JS_IsArray(ctx, argv[0])) {
+             ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
+
+             window = glfwCreateWindow(size.x, size.y, "ImGui", NULL, NULL);
+           } else {
+             window = js_imgui_getobj<GLFWwindow>(ctx, argv[0]);
+           }
+         }
+
+         if(window)
+           js_imgui_init_gl(window);
+         else
+           ret = JS_ThrowInternalError(ctx, "ImGui::Init expecting GLFWwindow*");*/
+        break;
       }
+      case IMGUI_CREATE_CONTEXT: {
+        ImFontAtlas* atlas = 0;
+        ImGuiContext* imctx = 0;
 
-      if(window)
-        js_imgui_init_gl(window);
-      else
-        ret = JS_ThrowInternalError(ctx, "ImGui::Init expecting GLFWwindow*");
-      break;
-    }
-    case IMGUI_CREATE_CONTEXT: {
-      ImFontAtlas* atlas = 0;
-      if(argc >= 1)
-        atlas = js_imfontatlas_data2(ctx, argv[0]);
-      ret = js_imgui_newptr(ctx, ImGui::CreateContext(atlas));
-      break;
-    }
-    case IMGUI_DESTROY_CONTEXT: {
-      ImGuiContext* context = js_imgui_getptr<ImGuiContext>(ctx, argv[0]);
-      ImGui_ImplOpenGL3_Shutdown();
-      ImGui_ImplGlfw_Shutdown();
+        if(argc > 0 && (atlas = js_imfontatlas_data(argv[0]))) {
+          --argc;
+          ++argv;
+        }
 
-      ImGui::DestroyContext(context);
-      break;
-    }
-    case IMGUI_GET_CURRENT_CONTEXT: {
-      ret = js_imgui_newptr(ctx, ImGui::GetCurrentContext());
-      break;
-    }
-    case IMGUI_SET_CURRENT_CONTEXT: {
-      ImGuiContext* context = js_imgui_getptr<ImGuiContext>(ctx, argv[0]);
-      ImGui::SetCurrentContext(context);
-      break;
-    }
-    case IMGUI_GET_IO: {
-      ret = js_imgui_io_wrap(ctx, new ImGuiIO(ImGui::GetIO()));
-      break;
-    }
-    case IMGUI_GET_STYLE: {
-      ret = js_imgui_style_wrap(ctx, new ImGuiStyle(ImGui::GetStyle()));
-      break;
-    }
-    case IMGUI_NEW_FRAME: {
-      ImGui_ImplOpenGL3_NewFrame();
-      ImGui_ImplGlfw_NewFrame();
+        if((imctx = ImGui::CreateContext(atlas))) {
+          for(JSValue impl : imgui_implementations) {
+            JSValue func = js_get_property(ctx, impl, impl_init_methods);
 
-      ImGui::NewFrame();
-      break;
-    }
-    case IMGUI_END_FRAME: {
-      ImGui::EndFrame();
-      break;
-    }
-    case IMGUI_RENDER: {
-      ImGui::Render();
-      break;
-    }
-    case IMGUI_GET_DRAW_DATA: {
-      ret = js_imgui_newptr(ctx, ImGui::GetDrawData());
-      break;
-    };
-    case IMGUI_RENDER_DRAW_DATA: {
-      ImDrawData* data = 0;
-      if(argc >= 1)
-        data = js_imgui_getptr<ImDrawData>(ctx, argv[0]);
-      if(!data)
-        data = ImGui::GetDrawData();
-      ImGui_ImplOpenGL3_RenderDrawData(data);
-      break;
-    };
-    case IMGUI_SHOW_DEMO_WINDOW: {
-      OutputArg<bool> p_open(ctx, argc > 0 ? argv[0] : JS_NULL);
-      ImGui::ShowAboutWindow(p_open);
-      break;
-    }
-    case IMGUI_SHOW_ABOUT_WINDOW: {
-      OutputArg<bool> p_open(ctx, argc > 0 ? argv[0] : JS_NULL);
-      ImGui::ShowAboutWindow(p_open);
-      break;
-    }
-    case IMGUI_SHOW_METRICS_WINDOW: {
-      OutputArg<bool> p_open(ctx, argc > 0 ? argv[0] : JS_NULL);
-      ImGui::ShowMetricsWindow(p_open);
-      break;
-    }
-    case IMGUI_SHOW_STYLE_EDITOR: {
-      ImGuiStyle* style = js_imgui_style_data2(ctx, argv[0]);
-      ImGui::ShowStyleEditor(style);
-      break;
-    }
-    case IMGUI_SHOW_STYLE_SELECTOR: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::ShowStyleSelector(label));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_SHOW_FONT_SELECTOR: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      ImGui::ShowFontSelector(label);
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_SHOW_USER_GUIDE: {
-      ImGui::ShowUserGuide();
-      break;
-    }
-    case IMGUI_GET_VERSION: {
-      ret = JS_NewString(ctx, ImGui::GetVersion());
-      break;
-    }
-    case IMGUI_STYLE_COLORS_DARK: {
-      ImGui::StyleColorsDark(js_imgui_style_data2(ctx, argv[0]));
-      break;
-    }
-    case IMGUI_STYLE_COLORS_CLASSIC: {
-      ImGui::StyleColorsClassic(js_imgui_style_data2(ctx, argv[0]));
-      break;
-    }
-    case IMGUI_STYLE_COLORS_LIGHT: {
-      ImGui::StyleColorsLight(js_imgui_style_data2(ctx, argv[0]));
-      break;
-    }
-    case IMGUI_BEGIN: {
-      const char* name = JS_ToCString(ctx, argv[0]);
-      int32_t window_flags = 0;
-      OutputArg<bool> p_open(ctx, argc >= 2 ? argv[1] : JS_NULL);
-      if(argc >= 3)
-        JS_ToInt32(ctx, &window_flags, argv[2]);
+            JS_Call(ctx, func, impl, argc, argv);
 
-      ret = JS_NewBool(ctx, ImGui::Begin(name, p_open, window_flags));
-      JS_FreeCString(ctx, name);
-      break;
-    }
-    case IMGUI_END: {
-      ImGui::End();
-      break;
-    }
-    case IMGUI_BEGIN_CHILD: {
-      const char* str_id = JS_IsString(argv[0]) ? JS_ToCString(ctx, argv[0]) : 0;
-      int32_t id = -1;
-      ImVec2 size(0, 0);
-      bool border = false;
-      int32_t flags = 0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &id, argv[0]);
-      if(argc >= 2)
-        size = js_imgui_getimvec2(ctx, argv[1]);
-      if(argc >= 3)
-        border = JS_ToBool(ctx, argv[2]);
-      if(argc >= 4)
-        JS_ToInt32(ctx, &flags, argv[3]);
-      ret = JS_NewBool(ctx, str_id ? ImGui::BeginChild(str_id, size, border, flags) : ImGui::BeginChild(id, size, border, flags));
-      if(str_id)
-        JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_END_CHILD: {
-      ImGui::EndChild();
-      break;
-    }
-    case IMGUI_IS_WINDOW_APPEARING: {
-      ret = JS_NewBool(ctx, ImGui::IsWindowAppearing());
-      break;
-    }
-    case IMGUI_IS_WINDOW_COLLAPSED: {
-      ret = JS_NewBool(ctx, ImGui::IsWindowCollapsed());
-      break;
-    }
-    case IMGUI_IS_WINDOW_FOCUSED: {
-      int32_t flags = 0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &flags, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsWindowFocused(flags));
-      break;
-    }
-    case IMGUI_IS_WINDOW_HOVERED: {
-      int32_t flags = 0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &flags, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsWindowHovered(flags));
-      break;
-    }
-    case IMGUI_GET_WINDOW_DRAW_LIST: break;
-    case IMGUI_GET_WINDOW_POS: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetWindowPos());
-      break;
-    }
-    case IMGUI_GET_WINDOW_SIZE: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetWindowSize());
-      break;
-    }
-    case IMGUI_GET_WINDOW_WIDTH: {
-      ret = JS_NewFloat64(ctx, ImGui::GetWindowWidth());
-      break;
-    }
-    case IMGUI_GET_WINDOW_HEIGHT: {
-      ret = JS_NewFloat64(ctx, ImGui::GetWindowHeight());
-      break;
-    }
-    case IMGUI_GET_CONTENT_REGION_MAX: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetContentRegionMax());
-      break;
-    }
-    case IMGUI_GET_CONTENT_REGION_AVAIL: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetContentRegionAvail());
-      break;
-    }
-    case IMGUI_GET_WINDOW_CONTENT_REGION_MIN: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetWindowContentRegionMin());
-      break;
-    }
-    case IMGUI_GET_WINDOW_CONTENT_REGION_MAX: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetWindowContentRegionMax());
-      break;
-    }
-    case IMGUI_SET_NEXT_WINDOW_POS: {
-      ImVec2 pos = js_imgui_getimvec2(ctx, argv[0]), pivot(0, 0);
-      int32_t cond = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &cond, argv[1]);
-      if(argc >= 3)
-        pivot = js_imgui_getimvec2(ctx, argv[2]);
-      ImGui::SetNextWindowPos(pos, cond, pivot);
-      break;
-    }
-    case IMGUI_SET_NEXT_WINDOW_SIZE: {
-      ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
-      int32_t cond = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &cond, argv[1]);
-      ImGui::SetNextWindowSize(size, cond);
-      break;
-    }
-    case IMGUI_SET_NEXT_WINDOW_SIZE_CONSTRAINTS: break;
-    case IMGUI_SET_NEXT_WINDOW_CONTENT_SIZE: {
-      ImGui::SetNextWindowContentSize(js_imgui_getimvec2(ctx, argv[0]));
-      break;
-    }
-    case IMGUI_SET_NEXT_WINDOW_COLLAPSED: {
-      bool collapsed = JS_ToBool(ctx, argv[0]);
-      int32_t cond = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &cond, argv[1]);
-      ImGui::SetNextWindowCollapsed(collapsed, cond);
-    }
-    case IMGUI_SET_NEXT_WINDOW_FOCUS: {
-      ImGui::SetNextWindowFocus();
-      break;
-    }
-    case IMGUI_SET_NEXT_WINDOW_BG_ALPHA: {
-      double alpha;
-      JS_ToFloat64(ctx, &alpha, argv[0]);
-      ImGui::SetNextWindowBgAlpha(alpha);
-      break;
-    }
-    case IMGUI_SET_WINDOW_POS: {
-      ImVec2 pos = js_imgui_getimvec2(ctx, argv[0]);
-      int32_t cond = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &cond, argv[1]);
-      ImGui::SetWindowPos(pos, cond);
-      break;
-    }
-    case IMGUI_SET_WINDOW_SIZE: {
-      ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
-      int32_t cond = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &cond, argv[1]);
-      ImGui::SetWindowSize(size, cond);
-      break;
-    }
-    case IMGUI_SET_WINDOW_COLLAPSED: {
-      bool collapsed = JS_ToBool(ctx, argv[0]);
-      int32_t cond = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &cond, argv[1]);
-      ImGui::SetWindowCollapsed(collapsed, cond);
-    }
-    case IMGUI_SET_WINDOW_FOCUS: {
-      if(argc >= 1) {
+            JS_FreeValue(ctx, func);
+          }
+        }
+
+        if(!JS_IsException(ret))
+          ret = imctx ? js_imgui_newptr(ctx, imctx) : JS_NULL;
+
+        break;
+      }
+      case IMGUI_DESTROY_CONTEXT: {
+        ImGuiContext* context = argc > 0 ? js_imgui_getptr<ImGuiContext>(ctx, argv[0]) : 0;
+
+        ret = js_invoke_all(ctx, imgui_implementations, "Shutdown", 0, 0);
+
+        ImGui::DestroyContext(context);
+        break;
+      }
+      case IMGUI_GET_CURRENT_CONTEXT: {
+        ret = js_imgui_newptr(ctx, ImGui::GetCurrentContext());
+        break;
+      }
+      case IMGUI_SET_CURRENT_CONTEXT: {
+        ImGuiContext* context = js_imgui_getptr<ImGuiContext>(ctx, argv[0]);
+        ImGui::SetCurrentContext(context);
+        break;
+      }
+      case IMGUI_GET_IO: {
+        ret = js_imgui_io_wrap(ctx, new ImGuiIO(ImGui::GetIO()));
+        break;
+      }
+      case IMGUI_GET_STYLE: {
+        ret = js_imgui_style_wrap(ctx, new ImGuiStyle(ImGui::GetStyle()));
+        break;
+      }
+      case IMGUI_NEW_FRAME: {
+        /*ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();*/
+
+        ImGui::NewFrame();
+        break;
+      }
+      case IMGUI_END_FRAME: {
+        ImGui::EndFrame();
+        break;
+      }
+      case IMGUI_RENDER: {
+        ImGui::Render();
+        break;
+      }
+      case IMGUI_GET_DRAW_DATA: {
+        ret = js_imgui_newptr(ctx, ImGui::GetDrawData());
+        break;
+      }
+      /*case IMGUI_RENDER_DRAW_DATA: {
+        ImDrawData* data = 0;
+        if(argc >= 1)
+          data = js_imgui_getptr<ImDrawData>(ctx, argv[0]);
+        if(!data)
+          data = ImGui::GetDrawData();
+        ImGui_ImplOpenGL3_RenderDrawData(data);
+        break;
+      }*/
+      case IMGUI_SHOW_DEMO_WINDOW: {
+        OutputArg<bool> p_open(ctx, argc > 0 ? argv[0] : JS_NULL);
+        ImGui::ShowDemoWindow(p_open);
+        break;
+      }
+      case IMGUI_SHOW_ABOUT_WINDOW: {
+        OutputArg<bool> p_open(ctx, argc > 0 ? argv[0] : JS_NULL);
+        ImGui::ShowAboutWindow(p_open);
+        break;
+      }
+      case IMGUI_SHOW_METRICS_WINDOW: {
+        OutputArg<bool> p_open(ctx, argc > 0 ? argv[0] : JS_NULL);
+        ImGui::ShowMetricsWindow(p_open);
+        break;
+      }
+      case IMGUI_SHOW_STYLE_EDITOR: {
+        ImGuiStyle* style = js_imgui_style_data2(ctx, argv[0]);
+        ImGui::ShowStyleEditor(style);
+        break;
+      }
+      case IMGUI_SHOW_STYLE_SELECTOR: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::ShowStyleSelector(label));
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_SHOW_FONT_SELECTOR: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        ImGui::ShowFontSelector(label);
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_SHOW_USER_GUIDE: {
+        ImGui::ShowUserGuide();
+        break;
+      }
+      case IMGUI_GET_VERSION: {
+        ret = JS_NewString(ctx, ImGui::GetVersion());
+        break;
+      }
+      case IMGUI_STYLE_COLORS_DARK: {
+        ImGui::StyleColorsDark(js_imgui_style_data2(ctx, argv[0]));
+        break;
+      }
+      case IMGUI_STYLE_COLORS_CLASSIC: {
+        ImGui::StyleColorsClassic(js_imgui_style_data2(ctx, argv[0]));
+        break;
+      }
+      case IMGUI_STYLE_COLORS_LIGHT: {
+        ImGui::StyleColorsLight(js_imgui_style_data2(ctx, argv[0]));
+        break;
+      }
+      case IMGUI_BEGIN: {
         const char* name = JS_ToCString(ctx, argv[0]);
-        ImGui::SetWindowFocus(name);
+        int32_t window_flags = 0;
+        OutputArg<bool> p_open(ctx, argc >= 2 ? argv[1] : JS_NULL);
+        if(argc >= 3)
+          JS_ToInt32(ctx, &window_flags, argv[2]);
+
+        ret = JS_NewBool(ctx, ImGui::Begin(name, p_open, window_flags));
         JS_FreeCString(ctx, name);
-      } else {
-        ImGui::SetWindowFocus();
+        break;
       }
-      break;
-    }
-    case IMGUI_SET_WINDOW_FONT_SCALE: {
-      double scale;
-      JS_ToFloat64(ctx, &scale, argv[0]);
-      ImGui::SetWindowFontScale(scale);
-      break;
-    }
-    case IMGUI_GET_SCROLL_X: {
-      ret = JS_NewFloat64(ctx, ImGui::GetScrollX());
-      break;
-    }
-    case IMGUI_GET_SCROLL_Y: {
-      ret = JS_NewFloat64(ctx, ImGui::GetScrollY());
-      break;
-    }
-    case IMGUI_GET_SCROLL_MAX_X: {
-      ret = JS_NewFloat64(ctx, ImGui::GetScrollMaxX());
-      break;
-    }
-    case IMGUI_GET_SCROLL_MAX_Y: {
-      ret = JS_NewFloat64(ctx, ImGui::GetScrollMaxY());
-      break;
-    }
-    case IMGUI_SET_SCROLL_X: {
-      double x;
-      JS_ToFloat64(ctx, &x, argv[0]);
-      ImGui::SetScrollX(x);
-    }
-    case IMGUI_SET_SCROLL_Y: {
-      double y;
-      JS_ToFloat64(ctx, &y, argv[0]);
-      ImGui::SetScrollX(y);
-    }
-    case IMGUI_SET_SCROLL_HERE_X: {
-      double center_x_ratio = 0.5;
-      if(argc >= 1)
-        JS_ToFloat64(ctx, &center_x_ratio, argv[0]);
-      ImGui::SetScrollHereX(center_x_ratio);
-    }
-    case IMGUI_SET_SCROLL_HERE_Y: {
-      double center_y_ratio = 0.5;
-      if(argc >= 1)
-        JS_ToFloat64(ctx, &center_y_ratio, argv[0]);
-      ImGui::SetScrollHereX(center_y_ratio);
-    }
-    case IMGUI_SET_SCROLL_FROM_POS_X: {
-      double local_x, center_x_ratio = 0.5;
-      JS_ToFloat64(ctx, &local_x, argv[0]);
-      if(argc >= 2)
-        JS_ToFloat64(ctx, &center_x_ratio, argv[1]);
-      ImGui::SetScrollFromPosX(local_x, center_x_ratio);
-    }
-    case IMGUI_SET_SCROLL_FROM_POS_Y: {
-      double local_y, center_y_ratio = 0.5;
-      JS_ToFloat64(ctx, &local_y, argv[0]);
-      if(argc >= 2)
-        JS_ToFloat64(ctx, &center_y_ratio, argv[1]);
-      ImGui::SetScrollFromPosX(local_y, center_y_ratio);
-    }
-    case IMGUI_PUSH_FONT: {
-      ImFont* font = js_imfont_data2(ctx, argv[0]);
-      ImGui::PushFont(font);
-      break;
-    }
-    case IMGUI_POP_FONT: {
-      ImGui::PopFont();
-      break;
-    }
-    case IMGUI_PUSH_STYLE_COLOR: {
-      int32_t idx;
-      JS_ToInt32(ctx, &idx, argv[0]);
-      if(JS_IsNumber(argv[1])) {
-        uint32_t col;
-        JS_ToUint32(ctx, &col, argv[1]);
-        ImGui::PushStyleColor(idx, col);
-      } else {
-        ImVec4 vec = js_imgui_getimvec4(ctx, argv[1]);
-        ImGui::PushStyleColor(idx, vec);
+      case IMGUI_END: {
+        ImGui::End();
+        break;
       }
-      break;
-    }
-    case IMGUI_POP_STYLE_COLOR: {
-      uint32_t count = 1;
-      if(argc >= 1)
-        JS_ToUint32(ctx, &count, argv[0]);
-      ImGui::PopStyleColor(count);
-      break;
-    }
-    case IMGUI_PUSH_STYLE_VAR: {
-      int32_t idx;
-      JS_ToInt32(ctx, &idx, argv[0]);
-      if(JS_IsNumber(argv[1])) {
-        double val;
-        JS_ToFloat64(ctx, &val, argv[1]);
-        ImGui::PushStyleVar(idx, val);
-      } else {
-        ImVec2 vec = js_imgui_getimvec2(ctx, argv[1]);
-        ImGui::PushStyleVar(idx, vec);
+      case IMGUI_BEGIN_CHILD: {
+        const char* str_id = JS_IsString(argv[0]) ? JS_ToCString(ctx, argv[0]) : 0;
+        int32_t id = -1;
+        ImVec2 size(0, 0);
+        bool border = false;
+        int32_t flags = 0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &id, argv[0]);
+        if(argc >= 2)
+          size = js_imgui_getimvec2(ctx, argv[1]);
+        if(argc >= 3)
+          border = JS_ToBool(ctx, argv[2]);
+        if(argc >= 4)
+          JS_ToInt32(ctx, &flags, argv[3]);
+        ret = JS_NewBool(ctx, str_id ? ImGui::BeginChild(str_id, size, border, flags) : ImGui::BeginChild(id, size, border, flags));
+        if(str_id)
+          JS_FreeCString(ctx, str_id);
+        break;
       }
-      break;
-    }
-    case IMGUI_POP_STYLE_VAR: {
-      uint32_t count = 1;
-      if(argc >= 1)
-        JS_ToUint32(ctx, &count, argv[0]);
-      ImGui::PopStyleVar(count);
-      break;
-    }
-    case IMGUI_GET_STYLE_COLOR_VEC4: {
-      uint32_t col;
-      JS_ToUint32(ctx, &col, argv[0]);
-      ret = js_imgui_newimvec4(ctx, ImGui::GetStyleColorVec4(col));
-      break;
-    }
-    case IMGUI_GET_FONT: {
-      ret = js_imfont_wrap(ctx, ImGui::GetFont());
-      break;
-    }
-    case IMGUI_GET_FONT_SIZE: {
-      ret = JS_NewFloat64(ctx, ImGui::GetFontSize());
-      break;
-    }
-    case IMGUI_GET_FONT_TEX_UV_WHITE_PIXEL: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetFontTexUvWhitePixel());
-      break;
-    }
-    case IMGUI_GET_COLORU32: {
-      if(JS_IsArray(ctx, argv[0])) {
-        ImVec4 color = js_imgui_getimvec4(ctx, argv[0]);
-        ret = JS_NewUint32(ctx, ImGui::GetColorU32(color));
-      } else if(argc >= 2) {
+      case IMGUI_END_CHILD: {
+        ImGui::EndChild();
+        break;
+      }
+      case IMGUI_IS_WINDOW_APPEARING: {
+        ret = JS_NewBool(ctx, ImGui::IsWindowAppearing());
+        break;
+      }
+      case IMGUI_IS_WINDOW_COLLAPSED: {
+        ret = JS_NewBool(ctx, ImGui::IsWindowCollapsed());
+        break;
+      }
+      case IMGUI_IS_WINDOW_FOCUSED: {
+        int32_t flags = 0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &flags, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsWindowFocused(flags));
+        break;
+      }
+      case IMGUI_IS_WINDOW_HOVERED: {
+        int32_t flags = 0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &flags, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsWindowHovered(flags));
+        break;
+      }
+      case IMGUI_GET_WINDOW_DRAW_LIST: break;
+      case IMGUI_GET_WINDOW_POS: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetWindowPos());
+        break;
+      }
+      case IMGUI_GET_WINDOW_SIZE: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetWindowSize());
+        break;
+      }
+      case IMGUI_GET_WINDOW_WIDTH: {
+        ret = JS_NewFloat64(ctx, ImGui::GetWindowWidth());
+        break;
+      }
+      case IMGUI_GET_WINDOW_HEIGHT: {
+        ret = JS_NewFloat64(ctx, ImGui::GetWindowHeight());
+        break;
+      }
+      case IMGUI_GET_CONTENT_REGION_MAX: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetContentRegionMax());
+        break;
+      }
+      case IMGUI_GET_CONTENT_REGION_AVAIL: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetContentRegionAvail());
+        break;
+      }
+      case IMGUI_GET_WINDOW_CONTENT_REGION_MIN: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetWindowContentRegionMin());
+        break;
+      }
+      case IMGUI_GET_WINDOW_CONTENT_REGION_MAX: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetWindowContentRegionMax());
+        break;
+      }
+      case IMGUI_SET_NEXT_WINDOW_POS: {
+        ImVec2 pos = js_imgui_getimvec2(ctx, argv[0]), pivot(0, 0);
+        int32_t cond = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &cond, argv[1]);
+        if(argc >= 3)
+          pivot = js_imgui_getimvec2(ctx, argv[2]);
+        ImGui::SetNextWindowPos(pos, cond, pivot);
+        break;
+      }
+      case IMGUI_SET_NEXT_WINDOW_SIZE: {
+        ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
+        int32_t cond = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &cond, argv[1]);
+        ImGui::SetNextWindowSize(size, cond);
+        break;
+      }
+      case IMGUI_SET_NEXT_WINDOW_SIZE_CONSTRAINTS: break;
+      case IMGUI_SET_NEXT_WINDOW_CONTENT_SIZE: {
+        ImGui::SetNextWindowContentSize(js_imgui_getimvec2(ctx, argv[0]));
+        break;
+      }
+      case IMGUI_SET_NEXT_WINDOW_COLLAPSED: {
+        bool collapsed = JS_ToBool(ctx, argv[0]);
+        int32_t cond = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &cond, argv[1]);
+        ImGui::SetNextWindowCollapsed(collapsed, cond);
+      }
+      case IMGUI_SET_NEXT_WINDOW_FOCUS: {
+        ImGui::SetNextWindowFocus();
+        break;
+      }
+      case IMGUI_SET_NEXT_WINDOW_BG_ALPHA: {
+        double alpha;
+        JS_ToFloat64(ctx, &alpha, argv[0]);
+        ImGui::SetNextWindowBgAlpha(alpha);
+        break;
+      }
+      case IMGUI_SET_WINDOW_POS: {
+        ImVec2 pos = js_imgui_getimvec2(ctx, argv[0]);
+        int32_t cond = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &cond, argv[1]);
+        ImGui::SetWindowPos(pos, cond);
+        break;
+      }
+      case IMGUI_SET_WINDOW_SIZE: {
+        ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
+        int32_t cond = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &cond, argv[1]);
+        ImGui::SetWindowSize(size, cond);
+        break;
+      }
+      case IMGUI_SET_WINDOW_COLLAPSED: {
+        bool collapsed = JS_ToBool(ctx, argv[0]);
+        int32_t cond = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &cond, argv[1]);
+        ImGui::SetWindowCollapsed(collapsed, cond);
+      }
+      case IMGUI_SET_WINDOW_FOCUS: {
+        if(argc >= 1) {
+          const char* name = JS_ToCString(ctx, argv[0]);
+          ImGui::SetWindowFocus(name);
+          JS_FreeCString(ctx, name);
+        } else {
+          ImGui::SetWindowFocus();
+        }
+        break;
+      }
+      case IMGUI_SET_WINDOW_FONT_SCALE: {
+        double scale;
+        JS_ToFloat64(ctx, &scale, argv[0]);
+        ImGui::SetWindowFontScale(scale);
+        break;
+      }
+      case IMGUI_GET_SCROLL_X: {
+        ret = JS_NewFloat64(ctx, ImGui::GetScrollX());
+        break;
+      }
+      case IMGUI_GET_SCROLL_Y: {
+        ret = JS_NewFloat64(ctx, ImGui::GetScrollY());
+        break;
+      }
+      case IMGUI_GET_SCROLL_MAX_X: {
+        ret = JS_NewFloat64(ctx, ImGui::GetScrollMaxX());
+        break;
+      }
+      case IMGUI_GET_SCROLL_MAX_Y: {
+        ret = JS_NewFloat64(ctx, ImGui::GetScrollMaxY());
+        break;
+      }
+      case IMGUI_SET_SCROLL_X: {
+        double x;
+        JS_ToFloat64(ctx, &x, argv[0]);
+        ImGui::SetScrollX(x);
+      }
+      case IMGUI_SET_SCROLL_Y: {
+        double y;
+        JS_ToFloat64(ctx, &y, argv[0]);
+        ImGui::SetScrollX(y);
+      }
+      case IMGUI_SET_SCROLL_HERE_X: {
+        double center_x_ratio = 0.5;
+        if(argc >= 1)
+          JS_ToFloat64(ctx, &center_x_ratio, argv[0]);
+        ImGui::SetScrollHereX(center_x_ratio);
+      }
+      case IMGUI_SET_SCROLL_HERE_Y: {
+        double center_y_ratio = 0.5;
+        if(argc >= 1)
+          JS_ToFloat64(ctx, &center_y_ratio, argv[0]);
+        ImGui::SetScrollHereX(center_y_ratio);
+      }
+      case IMGUI_SET_SCROLL_FROM_POS_X: {
+        double local_x, center_x_ratio = 0.5;
+        JS_ToFloat64(ctx, &local_x, argv[0]);
+        if(argc >= 2)
+          JS_ToFloat64(ctx, &center_x_ratio, argv[1]);
+        ImGui::SetScrollFromPosX(local_x, center_x_ratio);
+      }
+      case IMGUI_SET_SCROLL_FROM_POS_Y: {
+        double local_y, center_y_ratio = 0.5;
+        JS_ToFloat64(ctx, &local_y, argv[0]);
+        if(argc >= 2)
+          JS_ToFloat64(ctx, &center_y_ratio, argv[1]);
+        ImGui::SetScrollFromPosX(local_y, center_y_ratio);
+      }
+      case IMGUI_PUSH_FONT: {
+        ImFont* font = js_imfont_data2(ctx, argv[0]);
+        ImGui::PushFont(font);
+        break;
+      }
+      case IMGUI_POP_FONT: {
+        ImGui::PopFont();
+        break;
+      }
+      case IMGUI_PUSH_STYLE_COLOR: {
         int32_t idx;
-        double alpha_mul = 1.0f;
         JS_ToInt32(ctx, &idx, argv[0]);
-        JS_ToFloat64(ctx, &alpha_mul, argv[1]);
-        ret = JS_NewUint32(ctx, ImGui::GetColorU32(idx, alpha_mul));
-      } else {
+        if(JS_IsNumber(argv[1])) {
+          uint32_t col;
+          JS_ToUint32(ctx, &col, argv[1]);
+          ImGui::PushStyleColor(idx, col);
+        } else {
+          ImVec4 vec = js_imgui_getimvec4(ctx, argv[1]);
+          ImGui::PushStyleColor(idx, vec);
+        }
+        break;
+      }
+      case IMGUI_POP_STYLE_COLOR: {
+        uint32_t count = 1;
+        if(argc >= 1)
+          JS_ToUint32(ctx, &count, argv[0]);
+        ImGui::PopStyleColor(count);
+        break;
+      }
+      case IMGUI_PUSH_STYLE_VAR: {
+        int32_t idx;
+        JS_ToInt32(ctx, &idx, argv[0]);
+        if(JS_IsNumber(argv[1])) {
+          double val;
+          JS_ToFloat64(ctx, &val, argv[1]);
+          ImGui::PushStyleVar(idx, val);
+        } else {
+          ImVec2 vec = js_imgui_getimvec2(ctx, argv[1]);
+          ImGui::PushStyleVar(idx, vec);
+        }
+        break;
+      }
+      case IMGUI_POP_STYLE_VAR: {
+        uint32_t count = 1;
+        if(argc >= 1)
+          JS_ToUint32(ctx, &count, argv[0]);
+        ImGui::PopStyleVar(count);
+        break;
+      }
+      case IMGUI_GET_STYLE_COLOR_VEC4: {
         uint32_t col;
         JS_ToUint32(ctx, &col, argv[0]);
-        ret = JS_NewUint32(ctx, ImGui::GetColorU32(col));
-      }
-      break;
-    }
-    case IMGUI_PUSH_ITEM_WIDTH: {
-      int32_t width;
-      JS_ToInt32(ctx, &width, argv[0]);
-      ImGui::PushItemWidth(width);
-      break;
-    }
-    case IMGUI_POP_ITEM_WIDTH: {
-      ImGui::PopItemWidth();
-      break;
-    }
-    case IMGUI_CALC_ITEM_WIDTH: {
-      ret = JS_NewFloat64(ctx, ImGui::CalcItemWidth());
-      break;
-    }
-    case IMGUI_PUSH_TEXT_WRAP_POS: {
-      double wrap_local_pos_x = 0;
-      JS_ToFloat64(ctx, &wrap_local_pos_x, argv[0]);
-      ImGui::PushTextWrapPos(wrap_local_pos_x);
-      break;
-    }
-    case IMGUI_POP_TEXT_WRAP_POS: {
-      ImGui::PopTextWrapPos();
-      break;
-    }
-    case IMGUI_PUSH_ALLOW_KEYBOARD_FOCUS: {
-      ImGui::PushAllowKeyboardFocus(JS_ToBool(ctx, argv[0]));
-      break;
-    }
-    case IMGUI_POP_ALLOW_KEYBOARD_FOCUS: {
-      ImGui::PopAllowKeyboardFocus();
-      break;
-    }
-    case IMGUI_PUSH_BUTTON_REPEAT: {
-      ImGui::PushButtonRepeat(JS_ToBool(ctx, argv[0]));
-      break;
-    }
-    case IMGUI_POP_BUTTON_REPEAT: {
-      ImGui::PopButtonRepeat();
-      break;
-    }
-    case IMGUI_SEPARATOR: {
-      ImGui::Separator();
-      break;
-    }
-    case IMGUI_SAME_LINE: {
-      double offset_from_start_x = 0, spacing = -1.0;
-      JS_ToFloat64(ctx, &offset_from_start_x, argv[0]);
-      if(argc >= 2)
-        JS_ToFloat64(ctx, &spacing, argv[1]);
-      ImGui::SameLine(offset_from_start_x, spacing);
-      break;
-    }
-    case IMGUI_NEW_LINE: {
-      ImGui::NewLine();
-      break;
-    }
-    case IMGUI_SPACING: {
-      ImGui::Spacing();
-      break;
-    }
-    case IMGUI_DUMMY: {
-      ImGui::Dummy(js_imgui_getimvec2(ctx, argv[0]));
-      break;
-    }
-    case IMGUI_INDENT: {
-      double indent_w = 0;
-      JS_ToFloat64(ctx, &indent_w, argv[0]);
-      ImGui::Indent(indent_w);
-      break;
-    }
-    case IMGUI_UNINDENT: {
-      double indent_w = 0;
-      JS_ToFloat64(ctx, &indent_w, argv[0]);
-      ImGui::Unindent(indent_w);
-      break;
-    }
-    case IMGUI_BEGIN_GROUP: {
-      ImGui::BeginGroup();
-      break;
-    }
-    case IMGUI_END_GROUP: {
-      ImGui::EndGroup();
-      break;
-    }
-    case IMGUI_GET_CURSOR_POS: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetCursorPos());
-      break;
-    }
-    case IMGUI_GET_CURSOR_POS_X: {
-      ret = JS_NewFloat64(ctx, ImGui::GetCursorPosX());
-      break;
-    }
-    case IMGUI_GET_CURSOR_POS_Y: {
-      ret = JS_NewFloat64(ctx, ImGui::GetCursorPosY());
-      break;
-    }
-    case IMGUI_SET_CURSOR_POS: {
-      ImGui::SetCursorPos(js_imgui_getimvec2(ctx, argv[0]));
-      break;
-    }
-    case IMGUI_SET_CURSOR_POS_X: {
-      double x;
-      JS_ToFloat64(ctx, &x, argv[0]);
-      ImGui::SetCursorPosX(x);
-      break;
-    }
-    case IMGUI_SET_CURSOR_POS_Y: {
-      double y;
-      JS_ToFloat64(ctx, &y, argv[0]);
-      ImGui::SetCursorPosY(y);
-      break;
-    }
-    case IMGUI_GET_CURSOR_START_POS: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetCursorStartPos());
-      break;
-    }
-    case IMGUI_GET_CURSOR_SCREEN_POS: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetCursorScreenPos());
-      break;
-    }
-    case IMGUI_SET_CURSOR_SCREEN_POS: {
-      ImGui::SetCursorScreenPos(js_imgui_getimvec2(ctx, argv[0]));
-      break;
-    }
-    case IMGUI_ALIGN_TEXT_TO_FRAME_PADDING: {
-      ImGui::AlignTextToFramePadding();
-      break;
-    }
-    case IMGUI_GET_TEXT_LINE_HEIGHT: {
-      ret = JS_NewFloat64(ctx, ImGui::GetTextLineHeight());
-      break;
-    }
-    case IMGUI_GET_TEXT_LINE_HEIGHT_WITH_SPACING: {
-      ret = JS_NewFloat64(ctx, ImGui::GetTextLineHeightWithSpacing());
-      break;
-    }
-    case IMGUI_GET_FRAME_HEIGHT: {
-      ret = JS_NewFloat64(ctx, ImGui::GetFrameHeight());
-      break;
-    }
-    case IMGUI_GET_FRAME_HEIGHT_WITH_SPACING: {
-      ret = JS_NewFloat64(ctx, ImGui::GetFrameHeightWithSpacing());
-      break;
-    }
-    case IMGUI_PUSH_ID: {
-      if(argc >= 2) {
-        const char *id_begin = JS_ToCString(ctx, argv[0]), *id_end = JS_ToCString(ctx, argv[1]);
-        ImGui::PushID(id_begin, id_end);
-        JS_FreeCString(ctx, id_begin);
-        JS_FreeCString(ctx, id_end);
-      } else if(JS_IsString(argv[0])) {
-        const char* id = JS_ToCString(ctx, argv[0]);
-        ImGui::PushID(id);
-        JS_FreeCString(ctx, id);
-      } else if(JS_IsNumber(argv[0])) {
-        int32_t id;
-        JS_ToInt32(ctx, &id, argv[0]);
-        ImGui::PushID(id);
-      } else {
-        ret = JS_ThrowInternalError(ctx, "ImGui::PushID() invalid argument");
-      }
-      break;
-    }
-    case IMGUI_POP_ID: {
-      ImGui::PopID();
-      break;
-    }
-    case IMGUI_GET_ID: {
-      ImGuiID id = -1;
-      if(argc >= 2) {
-        const char *id_begin = JS_ToCString(ctx, argv[0]), *id_end = JS_ToCString(ctx, argv[1]);
-        id = ImGui::GetID(id_begin, id_end);
-        JS_FreeCString(ctx, id_begin);
-        JS_FreeCString(ctx, id_end);
-      } else if(JS_IsString(argv[0])) {
-        const char* id_str = JS_ToCString(ctx, argv[0]);
-        id = ImGui::GetID(id_str);
-        JS_FreeCString(ctx, id_str);
-      } else {
-        ret = JS_ThrowInternalError(ctx, "ImGui::GetID() invalid argument");
+        ret = js_imgui_newimvec4(ctx, ImGui::GetStyleColorVec4(col));
         break;
       }
-      ret = JS_NewInt32(ctx, id);
-      break;
-    }
-    case IMGUI_TEXT_UNFORMATTED: {
-      const char *text = JS_ToCString(ctx, argv[0]), *text_end = 0;
-      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
-        text_end = JS_ToCString(ctx, argv[1]);
-      ImGui::TextUnformatted(text, text_end);
-      JS_FreeCString(ctx, text);
-      if(text_end)
-        JS_FreeCString(ctx, text_end);
-      break;
-    }
-    case IMGUI_TEXT: {
-      int count = js_imgui_formatcount(ctx, argc, argv);
-      assert(count <= 32);
-      void* a[count];
-      js_imgui_formatargs(ctx, argc, argv, a);
-      ImGui::Text((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
-      break;
-    }
-    case IMGUI_TEXT_COLORED: {
-      ImVec4 color = js_imgui_getcolor(ctx, argv[0]);
-      int count = js_imgui_formatcount(ctx, argc - 1, argv + 1);
-      assert(count <= 32);
-      void* a[count];
-      js_imgui_formatargs(ctx, argc - 1, argv + 1, a);
-      ImGui::TextColored(color, (const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
-      break;
-    }
-    case IMGUI_TEXT_DISABLED: {
-      int count = js_imgui_formatcount(ctx, argc, argv);
-      assert(count <= 32);
-      void* a[count];
-      js_imgui_formatargs(ctx, argc, argv, a);
-      ImGui::TextDisabled((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
-      break;
-    }
-    case IMGUI_TEXT_WRAPPED: {
-      int count = js_imgui_formatcount(ctx, argc, argv);
-      assert(count <= 32);
-      void* a[count];
-      js_imgui_formatargs(ctx, argc, argv, a);
-      ImGui::TextWrapped((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
-      break;
-    }
-    case IMGUI_LABEL_TEXT: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      int count = js_imgui_formatcount(ctx, argc - 1, argv + 1);
-      assert(count <= 32);
-      void* a[count];
-      js_imgui_formatargs(ctx, argc - 1, argv + 1, a);
-      ImGui::LabelText(label, (const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_BULLET_TEXT: {
-      int count = js_imgui_formatcount(ctx, argc, argv);
-      assert(count <= 32);
-      void* a[count];
-      js_imgui_formatargs(ctx, argc, argv, a);
-      ImGui::BulletText((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
-      break;
-    }
-    case IMGUI_BUTTON: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      ImVec2 size(0, 0);
-      if(argc >= 2)
-        size = js_imgui_getimvec2(ctx, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::Button(label, size));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_SMALL_BUTTON: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::SmallButton(label));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_INVISIBLE_BUTTON: {
-      const char* str_id = JS_ToCString(ctx, argv[0]);
-      ImVec2 size(0, 0);
-      int32_t flags = 0;
-      if(argc >= 2)
-        size = js_imgui_getimvec2(ctx, argv[1]);
-      if(argc >= 3)
-        JS_ToInt32(ctx, &flags, argv[2]);
-      ret = JS_NewBool(ctx, ImGui::InvisibleButton(str_id, size, flags));
-      JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_ARROW_BUTTON: {
-      const char* str_id = JS_ToCString(ctx, argv[0]);
-      int32_t dir = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &dir, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::ArrowButton(str_id, dir));
-      JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_IMAGE: {
-      ImTextureID tex = js_imgui_gettexture(ctx, argv[0]);
-      ImVec2 size = js_imgui_getimvec2(ctx, argv[1]);
-      ImVec2 uv0(0, 0), uv1(1, 1);
-      ImVec4 tint_col(1, 1, 1, 1), border_col(0, 0, 0, 0);
-      if(argc >= 3)
-        uv0 = js_imgui_getimvec2(ctx, argv[2]);
-      if(argc >= 4)
-        uv1 = js_imgui_getimvec2(ctx, argv[3]);
-      if(argc >= 5)
-        tint_col = js_imgui_getimvec4(ctx, argv[4]);
-      if(argc >= 6)
-        border_col = js_imgui_getimvec4(ctx, argv[5]);
-      ImGui::Image(tex, size, uv0, uv1, tint_col, border_col);
-      break;
-    }
-    case IMGUI_IMAGE_BUTTON: {
-      ImTextureID tex = js_imgui_gettexture(ctx, argv[0]);
-      ImVec2 size = js_imgui_getimvec2(ctx, argv[1]);
-      ImVec2 uv0(0, 0), uv1(1, 1);
-      int32_t frame_padding = -1;
-      ImVec4 tint_col(1, 1, 1, 1), border_col(0, 0, 0, 0);
-      if(argc >= 3)
-        uv0 = js_imgui_getimvec2(ctx, argv[2]);
-      if(argc >= 4)
-        uv1 = js_imgui_getimvec2(ctx, argv[3]);
-      if(argc >= 5)
-        JS_ToInt32(ctx, &frame_padding, argv[4]);
-      if(argc >= 6)
-        tint_col = js_imgui_getimvec4(ctx, argv[5]);
-      if(argc >= 7)
-        border_col = js_imgui_getimvec4(ctx, argv[6]);
-      ret = JS_NewBool(ctx, ImGui::ImageButton(tex, size, uv0, uv1, frame_padding, tint_col, border_col));
-      break;
-    }
-    case IMGUI_CHECKBOX: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<bool> p_checked(ctx, argc > 1 ? argv[1] : JS_NULL);
-
-      ret = JS_NewBool(ctx, ImGui::Checkbox(label, p_checked));
-      break;
-    }
-    case IMGUI_CHECKBOX_FLAGS: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      int64_t flags_value;
-      JS_ToInt64(ctx, &flags_value, argv[2]);
-
-      if(flags_value < 0) {
-        OutputArg<int> p_flags(ctx, argv[1]);
-        ret = JS_NewBool(ctx, ImGui::CheckboxFlags(label, static_cast<int*>(p_flags), static_cast<int>(flags_value)));
-      } else {
-        OutputArg<unsigned int> p_flags(ctx, argv[1]);
-        ret = JS_NewBool(ctx, ImGui::CheckboxFlags(label, static_cast<unsigned int*>(p_flags), static_cast<unsigned int>(flags_value)));
-      }
-
-      break;
-    }
-    case IMGUI_RADIO_BUTTON: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      bool active = JS_ToBool(ctx, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::RadioButton(label, active));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_PROGRESS_BAR: {
-      double fraction;
-      ImVec2 size_arg(-FLT_MIN, 0);
-      const char* overlay = 0;
-      JS_ToFloat64(ctx, &fraction, argv[0]);
-      if(argc >= 2)
-        size_arg = js_imgui_getimvec2(ctx, argv[1]);
-      if(argc >= 3 && !(JS_IsNull(argv[2]) || JS_IsUndefined(argv[2])))
-        overlay = JS_ToCString(ctx, argv[2]);
-      ImGui::ProgressBar(fraction, size_arg, overlay);
-      if(overlay)
-        JS_FreeCString(ctx, overlay);
-      break;
-    }
-    case IMGUI_BULLET: {
-      ImGui::Bullet();
-      break;
-    }
-    case IMGUI_BEGIN_COMBO: {
-      const char *label = JS_ToCString(ctx, argv[0]), *preview_value = JS_ToCString(ctx, argv[1]);
-      int32_t flags = 0;
-      if(argc >= 3)
-        JS_ToInt32(ctx, &flags, argv[2]);
-      ret = JS_NewBool(ctx, ImGui::BeginCombo(label, preview_value, flags));
-      JS_FreeCString(ctx, label);
-      JS_FreeCString(ctx, preview_value);
-      break;
-    }
-    case IMGUI_END_COMBO: {
-      ImGui::EndCombo();
-      break;
-    }
-    case IMGUI_COMBO: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<int> p_value(ctx, argv[1]);
-      ItemsGetterUserData user_data = {ctx, argv[2]};
-      int32_t items_count = -1, popup_max_height_in_items = -1;
-      JS_ToInt32(ctx, &items_count, argv[3]);
-      if(argc > 4)
-        JS_ToInt32(ctx, &popup_max_height_in_items, argv[4]);
-
-      ret = JS_NewBool(ctx, ImGui::Combo(label, p_value, js_items_getter, &user_data, items_count, popup_max_height_in_items));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_DRAG_FLOAT: break;
-    case IMGUI_DRAG_FLOAT2: break;
-    case IMGUI_DRAG_FLOAT3: break;
-    case IMGUI_DRAG_FLOAT4: break;
-    case IMGUI_DRAG_FLOAT_RANGE2: break;
-    case IMGUI_DRAG_INT: break;
-    case IMGUI_DRAG_INT2: break;
-    case IMGUI_DRAG_INT3: break;
-    case IMGUI_DRAG_INT4: break;
-    case IMGUI_DRAG_INT_RANGE2: break;
-    case IMGUI_DRAG_SCALAR: break;
-    case IMGUI_DRAG_SCALAR_N: break;
-    case IMGUI_SLIDER_FLOAT: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<float> p_value(ctx, argv[1]);
-      double vmin = 0, vmax = 1;
-      const char* format = 0;
-      int32_t flags = 0;
-
-      JS_ToFloat64(ctx, &vmin, argv[2]);
-      JS_ToFloat64(ctx, &vmax, argv[3]);
-      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-        format = JS_ToCString(ctx, argv[4]);
-      if(argc > 5)
-        JS_ToInt32(ctx, &flags, argv[5]);
-
-      ret = JS_NewBool(ctx, ImGui::SliderFloat(label, p_value, vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
-
-      if(format)
-        JS_FreeCString(ctx, format);
-      break;
-    }
-    case IMGUI_SLIDER_FLOAT2: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<std::array<float, 2>> p_values(ctx, argv[1]);
-      double vmin = 0, vmax = 1;
-      const char* format = 0;
-      int32_t flags = 0;
-
-      JS_ToFloat64(ctx, &vmin, argv[2]);
-      JS_ToFloat64(ctx, &vmax, argv[3]);
-      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-        format = JS_ToCString(ctx, argv[4]);
-      if(argc > 5)
-        JS_ToInt32(ctx, &flags, argv[5]);
-
-      ret = JS_NewBool(ctx, ImGui::SliderFloat2(label, static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
-
-      if(format)
-        JS_FreeCString(ctx, format);
-      break;
-    }
-    case IMGUI_SLIDER_FLOAT3: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<std::array<float, 3>> p_values(ctx, argv[1]);
-      double vmin = 0, vmax = 1;
-      const char* format = 0;
-      int32_t flags = 0;
-
-      JS_ToFloat64(ctx, &vmin, argv[2]);
-      JS_ToFloat64(ctx, &vmax, argv[3]);
-      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-        format = JS_ToCString(ctx, argv[4]);
-      if(argc > 5)
-        JS_ToInt32(ctx, &flags, argv[5]);
-
-      ret = JS_NewBool(ctx, ImGui::SliderFloat3(label, static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
-
-      if(format)
-        JS_FreeCString(ctx, format);
-      break;
-    }
-    case IMGUI_SLIDER_FLOAT4: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<std::array<float, 4>> p_values(ctx, argv[1]);
-      double vmin = 0, vmax = 1;
-      const char* format = 0;
-      int32_t flags = 0;
-
-      JS_ToFloat64(ctx, &vmin, argv[2]);
-      JS_ToFloat64(ctx, &vmax, argv[3]);
-      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-        format = JS_ToCString(ctx, argv[4]);
-      if(argc > 5)
-        JS_ToInt32(ctx, &flags, argv[5]);
-
-      ret = JS_NewBool(ctx, ImGui::SliderFloat3(label, static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
-
-      if(format)
-        JS_FreeCString(ctx, format);
-      break;
-    }
-    case IMGUI_SLIDER_ANGLE: break;
-    case IMGUI_SLIDER_INT: break;
-    case IMGUI_SLIDER_INT2: break;
-    case IMGUI_SLIDER_INT3: break;
-    case IMGUI_SLIDER_INT4: break;
-    case IMGUI_SLIDER_SCALAR: break;
-    case IMGUI_SLIDER_SCALAR_N: break;
-    case IMGUI_V_SLIDER_FLOAT: break;
-    case IMGUI_V_SLIDER_INT: break;
-    case IMGUI_V_SLIDER_SCALAR: break;
-    case IMGUI_INPUT_TEXT: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      uint32_t buf_size;
-      size_t size;
-      uint8_t* buffer;
-      int32_t flags = 0;
-      std::pair<ImGuiInputTextCallback, void*> cb = {nullptr, nullptr};
-      InputTextUserData context = {ctx, argv[1]};
-
-      if(!(buffer = JS_GetArrayBuffer(ctx, &size, argv[1]))) {
-        ret = JS_ThrowTypeError(ctx, "argument 2 must be an ArrayBuffer");
+      case IMGUI_GET_FONT: {
+        ret = js_imfont_wrap(ctx, ImGui::GetFont());
         break;
       }
-
-      buf_size = size;
-      if(argc > 2)
-        JS_ToUint32(ctx, &buf_size, argv[2]);
-      if(argc > 3)
-        JS_ToInt32(ctx, &flags, argv[3]);
-
-      if(argc > 4) {
-        if(!JS_IsFunction(ctx, argv[4])) {
-          ret = JS_ThrowTypeError(ctx, "argument 5 must be a Function");
+      case IMGUI_GET_FONT_SIZE: {
+        ret = JS_NewFloat64(ctx, ImGui::GetFontSize());
+        break;
+      }
+      case IMGUI_GET_FONT_TEX_UV_WHITE_PIXEL: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetFontTexUvWhitePixel());
+        break;
+      }
+      case IMGUI_GET_COLORU32: {
+        if(JS_IsArray(ctx, argv[0])) {
+          ImVec4 color = js_imgui_getimvec4(ctx, argv[0]);
+          ret = JS_NewUint32(ctx, ImGui::GetColorU32(color));
+        } else if(argc >= 2) {
+          int32_t idx;
+          double alpha_mul = 1.0f;
+          JS_ToInt32(ctx, &idx, argv[0]);
+          JS_ToFloat64(ctx, &alpha_mul, argv[1]);
+          ret = JS_NewUint32(ctx, ImGui::GetColorU32(idx, alpha_mul));
+        } else {
+          uint32_t col;
+          JS_ToUint32(ctx, &col, argv[0]);
+          ret = JS_NewUint32(ctx, ImGui::GetColorU32(col));
+        }
+        break;
+      }
+      case IMGUI_PUSH_ITEM_WIDTH: {
+        int32_t width;
+        JS_ToInt32(ctx, &width, argv[0]);
+        ImGui::PushItemWidth(width);
+        break;
+      }
+      case IMGUI_POP_ITEM_WIDTH: {
+        ImGui::PopItemWidth();
+        break;
+      }
+      case IMGUI_CALC_ITEM_WIDTH: {
+        ret = JS_NewFloat64(ctx, ImGui::CalcItemWidth());
+        break;
+      }
+      case IMGUI_PUSH_TEXT_WRAP_POS: {
+        double wrap_local_pos_x = 0;
+        JS_ToFloat64(ctx, &wrap_local_pos_x, argv[0]);
+        ImGui::PushTextWrapPos(wrap_local_pos_x);
+        break;
+      }
+      case IMGUI_POP_TEXT_WRAP_POS: {
+        ImGui::PopTextWrapPos();
+        break;
+      }
+      case IMGUI_PUSH_ALLOW_KEYBOARD_FOCUS: {
+        ImGui::PushAllowKeyboardFocus(JS_ToBool(ctx, argv[0]));
+        break;
+      }
+      case IMGUI_POP_ALLOW_KEYBOARD_FOCUS: {
+        ImGui::PopAllowKeyboardFocus();
+        break;
+      }
+      case IMGUI_PUSH_BUTTON_REPEAT: {
+        ImGui::PushButtonRepeat(JS_ToBool(ctx, argv[0]));
+        break;
+      }
+      case IMGUI_POP_BUTTON_REPEAT: {
+        ImGui::PopButtonRepeat();
+        break;
+      }
+      case IMGUI_SEPARATOR: {
+        ImGui::Separator();
+        break;
+      }
+      case IMGUI_SAME_LINE: {
+        double offset_from_start_x = 0, spacing = -1.0;
+        JS_ToFloat64(ctx, &offset_from_start_x, argv[0]);
+        if(argc >= 2)
+          JS_ToFloat64(ctx, &spacing, argv[1]);
+        ImGui::SameLine(offset_from_start_x, spacing);
+        break;
+      }
+      case IMGUI_NEW_LINE: {
+        ImGui::NewLine();
+        break;
+      }
+      case IMGUI_SPACING: {
+        ImGui::Spacing();
+        break;
+      }
+      case IMGUI_DUMMY: {
+        ImGui::Dummy(js_imgui_getimvec2(ctx, argv[0]));
+        break;
+      }
+      case IMGUI_INDENT: {
+        double indent_w = 0;
+        JS_ToFloat64(ctx, &indent_w, argv[0]);
+        ImGui::Indent(indent_w);
+        break;
+      }
+      case IMGUI_UNINDENT: {
+        double indent_w = 0;
+        JS_ToFloat64(ctx, &indent_w, argv[0]);
+        ImGui::Unindent(indent_w);
+        break;
+      }
+      case IMGUI_BEGIN_GROUP: {
+        ImGui::BeginGroup();
+        break;
+      }
+      case IMGUI_END_GROUP: {
+        ImGui::EndGroup();
+        break;
+      }
+      case IMGUI_GET_CURSOR_POS: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetCursorPos());
+        break;
+      }
+      case IMGUI_GET_CURSOR_POS_X: {
+        ret = JS_NewFloat64(ctx, ImGui::GetCursorPosX());
+        break;
+      }
+      case IMGUI_GET_CURSOR_POS_Y: {
+        ret = JS_NewFloat64(ctx, ImGui::GetCursorPosY());
+        break;
+      }
+      case IMGUI_SET_CURSOR_POS: {
+        ImGui::SetCursorPos(js_imgui_getimvec2(ctx, argv[0]));
+        break;
+      }
+      case IMGUI_SET_CURSOR_POS_X: {
+        double x;
+        JS_ToFloat64(ctx, &x, argv[0]);
+        ImGui::SetCursorPosX(x);
+        break;
+      }
+      case IMGUI_SET_CURSOR_POS_Y: {
+        double y;
+        JS_ToFloat64(ctx, &y, argv[0]);
+        ImGui::SetCursorPosY(y);
+        break;
+      }
+      case IMGUI_GET_CURSOR_START_POS: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetCursorStartPos());
+        break;
+      }
+      case IMGUI_GET_CURSOR_SCREEN_POS: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetCursorScreenPos());
+        break;
+      }
+      case IMGUI_SET_CURSOR_SCREEN_POS: {
+        ImGui::SetCursorScreenPos(js_imgui_getimvec2(ctx, argv[0]));
+        break;
+      }
+      case IMGUI_ALIGN_TEXT_TO_FRAME_PADDING: {
+        ImGui::AlignTextToFramePadding();
+        break;
+      }
+      case IMGUI_GET_TEXT_LINE_HEIGHT: {
+        ret = JS_NewFloat64(ctx, ImGui::GetTextLineHeight());
+        break;
+      }
+      case IMGUI_GET_TEXT_LINE_HEIGHT_WITH_SPACING: {
+        ret = JS_NewFloat64(ctx, ImGui::GetTextLineHeightWithSpacing());
+        break;
+      }
+      case IMGUI_GET_FRAME_HEIGHT: {
+        ret = JS_NewFloat64(ctx, ImGui::GetFrameHeight());
+        break;
+      }
+      case IMGUI_GET_FRAME_HEIGHT_WITH_SPACING: {
+        ret = JS_NewFloat64(ctx, ImGui::GetFrameHeightWithSpacing());
+        break;
+      }
+      case IMGUI_PUSH_ID: {
+        if(argc >= 2) {
+          const char *id_begin = JS_ToCString(ctx, argv[0]), *id_end = JS_ToCString(ctx, argv[1]);
+          ImGui::PushID(id_begin, id_end);
+          JS_FreeCString(ctx, id_begin);
+          JS_FreeCString(ctx, id_end);
+        } else if(JS_IsString(argv[0])) {
+          const char* id = JS_ToCString(ctx, argv[0]);
+          ImGui::PushID(id);
+          JS_FreeCString(ctx, id);
+        } else if(JS_IsNumber(argv[0])) {
+          int32_t id;
+          JS_ToInt32(ctx, &id, argv[0]);
+          ImGui::PushID(id);
+        } else {
+          ret = JS_ThrowInternalError(ctx, "ImGui::PushID() invalid argument");
+        }
+        break;
+      }
+      case IMGUI_POP_ID: {
+        ImGui::PopID();
+        break;
+      }
+      case IMGUI_GET_ID: {
+        ImGuiID id = -1;
+        if(argc >= 2) {
+          const char *id_begin = JS_ToCString(ctx, argv[0]), *id_end = JS_ToCString(ctx, argv[1]);
+          id = ImGui::GetID(id_begin, id_end);
+          JS_FreeCString(ctx, id_begin);
+          JS_FreeCString(ctx, id_end);
+        } else if(JS_IsString(argv[0])) {
+          const char* id_str = JS_ToCString(ctx, argv[0]);
+          id = ImGui::GetID(id_str);
+          JS_FreeCString(ctx, id_str);
+        } else {
+          ret = JS_ThrowInternalError(ctx, "ImGui::GetID() invalid argument");
           break;
         }
-        cb = js_imgui_input_text_args(ctx, context, argc - 4, argv + 4);
-      }
-
-      ret = JS_NewBool(ctx, ImGui::InputText(label, reinterpret_cast<char*>(buffer), buf_size, ImGuiInputTextFlags(flags), cb.first, cb.second));
-
-      break;
-    }
-    case IMGUI_INPUT_TEXT_MULTILINE: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      uint32_t buf_size;
-      size_t len;
-      uint8_t* buffer;
-      int32_t flags = 0;
-      std::pair<ImGuiInputTextCallback, void*> cb = {nullptr, nullptr};
-      InputTextUserData context = {ctx, argv[1]};
-      ImVec2 size(0, 0);
-
-      if(!(buffer = JS_GetArrayBuffer(ctx, &len, argv[1]))) {
-        ret = JS_ThrowTypeError(ctx, "argument 2 must be an ArrayBuffer");
+        ret = JS_NewInt32(ctx, id);
         break;
       }
-
-      buf_size = len;
-      if(argc > 2)
-        JS_ToUint32(ctx, &buf_size, argv[2]);
-
-      if(argc > 3)
-        size = js_imgui_getimvec2(ctx, argv[3]);
-
-      if(argc > 4)
-        JS_ToInt32(ctx, &flags, argv[4]);
-
-      if(argc > 5) {
-        if(!JS_IsFunction(ctx, argv[5])) {
-          ret = JS_ThrowTypeError(ctx, "argument 6 must be a Function");
-          break;
-        }
-        cb = js_imgui_input_text_args(ctx, context, argc - 5, argv + 5);
+      case IMGUI_TEXT_UNFORMATTED: {
+        const char *text = JS_ToCString(ctx, argv[0]), *text_end = 0;
+        if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+          text_end = JS_ToCString(ctx, argv[1]);
+        ImGui::TextUnformatted(text, text_end);
+        JS_FreeCString(ctx, text);
+        if(text_end)
+          JS_FreeCString(ctx, text_end);
+        break;
       }
-
-      ret = JS_NewBool(ctx, ImGui::InputTextMultiline(label, reinterpret_cast<char*>(buffer), buf_size, size, ImGuiInputTextFlags(flags), cb.first, cb.second));
-      break;
-    }
-    case IMGUI_INPUT_TEXT_WITH_HINT: break;
-    case IMGUI_INPUT_FLOAT: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<float> p_value(ctx, argv[1]);
-      double step = 0, step_fast = 0;
-      const char* format = 0;
-      int32_t flags = 0;
-
-      JS_ToFloat64(ctx, &step, argv[2]);
-      JS_ToFloat64(ctx, &step_fast, argv[3]);
-      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-        format = JS_ToCString(ctx, argv[4]);
-      if(argc > 5)
-        JS_ToInt32(ctx, &flags, argv[5]);
-
-      ret = JS_NewBool(ctx, ImGui::InputFloat(label, p_value, step, step_fast, format ? format : "%.3f", ImGuiInputTextFlags(flags)));
-
-      if(format)
-        JS_FreeCString(ctx, format);
-      break;
-    }
-    case IMGUI_INPUT_FLOAT2: break;
-    case IMGUI_INPUT_FLOAT3: break;
-    case IMGUI_INPUT_FLOAT4: break;
-    case IMGUI_INPUT_INT: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<int> p_value(ctx, argv[1]);
-      int32_t step = 0, step_fast = 0, flags = 0;
-
-      JS_ToInt32(ctx, &step, argv[2]);
-      JS_ToInt32(ctx, &step_fast, argv[3]);
-
-      if(argc > 4)
-        JS_ToInt32(ctx, &flags, argv[4]);
-
-      ret = JS_NewBool(ctx, ImGui::InputInt(label, p_value, step, step_fast, ImGuiInputTextFlags(flags)));
-      break;
-    }
-    case IMGUI_INPUT_INT2: break;
-    case IMGUI_INPUT_INT3: break;
-    case IMGUI_INPUT_INT4: break;
-    case IMGUI_INPUT_DOUBLE: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<double> p_value(ctx, argv[1]);
-      double step = 0, step_fast = 0;
-      const char* format = 0;
-      int32_t flags = 0;
-
-      JS_ToFloat64(ctx, &step, argv[2]);
-      JS_ToFloat64(ctx, &step_fast, argv[3]);
-
-      if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-        format = JS_ToCString(ctx, argv[4]);
-      if(argc > 5)
-        JS_ToInt32(ctx, &flags, argv[5]);
-
-      ret = JS_NewBool(ctx, ImGui::InputDouble(label, p_value, step, step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
-
-      if(format)
-        JS_FreeCString(ctx, format);
-      break;
-    }
-    case IMGUI_INPUT_SCALAR: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<union ImGuiDataTypeUnion> p_value(ctx, argv[2]);
-      const char* format = 0;
-      int32_t type = 0, flags = 0;
-      union ImGuiDataTypeUnion scalar, step, step_fast;
-
-      JS_ToInt32(ctx, &type, argv[1]);
-
-      js_to_scalar(ctx, p_value, argv[2], type);
-      js_to_scalar(ctx, &step, argv[3], type);
-      js_to_scalar(ctx, &step_fast, argv[4], type);
-
-      if(argc > 5 && !(JS_IsUndefined(argv[5]) || JS_IsNull(argv[5])))
-        format = JS_ToCString(ctx, argv[5]);
-      if(argc > 6)
-        JS_ToInt32(ctx, &flags, argv[6]);
-
-      ret = JS_NewBool(ctx, ImGui::InputScalar(label, type, static_cast<union ImGuiDataTypeUnion*>(p_value), &step, &step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
-
-      if(format)
-        JS_FreeCString(ctx, format);
-      break;
-    }
-    case IMGUI_INPUT_SCALAR_N: break;
-    case IMGUI_COLOR_EDIT3: break;
-    case IMGUI_COLOR_EDIT4: break;
-    case IMGUI_COLOR_PICKER3: break;
-    case IMGUI_COLOR_PICKER4: break;
-    case IMGUI_COLOR_BUTTON: break;
-    case IMGUI_SET_COLOR_EDIT_OPTIONS: {
-      int32_t options;
-      JS_ToInt32(ctx, &options, argv[0]);
-      ImGui::SetColorEditOptions(options);
-      break;
-    }
-    case IMGUI_TREE_NODE: {
-      if(argc > 1 /* && JS_IsString(argv[0])*/) {
-        const char* str_id = JS_ToCString(ctx, argv[0]);
+      case IMGUI_TEXT: {
+        int count = js_imgui_formatcount(ctx, argc, argv);
+        assert(count <= 32);
+        void* a[count];
+        js_imgui_formatargs(ctx, argc, argv, a);
+        ImGui::Text((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
+        break;
+      }
+      case IMGUI_TEXT_COLORED: {
+        ImVec4 color = js_imgui_getcolor(ctx, argv[0]);
         int count = js_imgui_formatcount(ctx, argc - 1, argv + 1);
         assert(count <= 32);
         void* a[count];
         js_imgui_formatargs(ctx, argc - 1, argv + 1, a);
-        ret = JS_NewBool(ctx, ImGui::TreeNode(str_id, (const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]));
-        JS_FreeCString(ctx, str_id);
-      } else {
-        const char* label = JS_ToCString(ctx, argv[0]);
-        ret = JS_NewBool(ctx, ImGui::TreeNode(label));
-        JS_FreeCString(ctx, label);
+        ImGui::TextColored(color, (const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
+        break;
       }
-      break;
-    }
-    case IMGUI_TREE_NODE_EX: {
-      int32_t flags = 0;
-      JS_ToInt32(ctx, &flags, argv[1]);
-
-      if(argc > 1 /* && JS_IsString(argv[0])*/) {
-        const char* str_id = JS_ToCString(ctx, argv[0]);
-        int count = js_imgui_formatcount(ctx, argc - 2, argv + 2);
+      case IMGUI_TEXT_DISABLED: {
+        int count = js_imgui_formatcount(ctx, argc, argv);
         assert(count <= 32);
         void* a[count];
-        js_imgui_formatargs(ctx, argc - 2, argv + 2, a);
-        ret = JS_NewBool(ctx, ImGui::TreeNodeEx(str_id, flags, (const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]));
-        JS_FreeCString(ctx, str_id);
-      } else {
+        js_imgui_formatargs(ctx, argc, argv, a);
+        ImGui::TextDisabled((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
+        break;
+      }
+      case IMGUI_TEXT_WRAPPED: {
+        int count = js_imgui_formatcount(ctx, argc, argv);
+        assert(count <= 32);
+        void* a[count];
+        js_imgui_formatargs(ctx, argc, argv, a);
+        ImGui::TextWrapped((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
+        break;
+      }
+      case IMGUI_LABEL_TEXT: {
         const char* label = JS_ToCString(ctx, argv[0]);
-        ret = JS_NewBool(ctx, ImGui::TreeNodeEx(label, flags));
+        int count = js_imgui_formatcount(ctx, argc - 1, argv + 1);
+        assert(count <= 32);
+        void* a[count];
+        js_imgui_formatargs(ctx, argc - 1, argv + 1, a);
+        ImGui::LabelText(label, (const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
         JS_FreeCString(ctx, label);
+        break;
       }
-      break;
-    }
-    case IMGUI_TREE_PUSH: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      ImGui::TreePush(label);
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_TREE_POP: {
-      ImGui::TreePop();
-      break;
-    }
-    case IMGUI_GET_TREE_NODE_TO_LABEL_SPACING: {
-      ret = JS_NewFloat64(ctx, ImGui::GetTreeNodeToLabelSpacing());
-      break;
-    }
-    case IMGUI_COLLAPSING_HEADER: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      int32_t flags = 0;
-      OutputArg<bool> p_visible(ctx, argc >= 2 ? argv[1] : JS_NULL);
-      if(argc >= 3)
-        JS_ToInt32(ctx, &flags, argv[2]);
+      case IMGUI_BULLET_TEXT: {
+        int count = js_imgui_formatcount(ctx, argc, argv);
+        assert(count <= 32);
+        void* a[count];
+        js_imgui_formatargs(ctx, argc, argv, a);
+        ImGui::BulletText((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
+        break;
+      }
+      case IMGUI_BUTTON: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        ImVec2 size(0, 0);
+        if(argc >= 2)
+          size = js_imgui_getimvec2(ctx, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::Button(label, size));
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_SMALL_BUTTON: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::SmallButton(label));
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_INVISIBLE_BUTTON: {
+        const char* str_id = JS_ToCString(ctx, argv[0]);
+        ImVec2 size(0, 0);
+        int32_t flags = 0;
+        if(argc >= 2)
+          size = js_imgui_getimvec2(ctx, argv[1]);
+        if(argc >= 3)
+          JS_ToInt32(ctx, &flags, argv[2]);
+        ret = JS_NewBool(ctx, ImGui::InvisibleButton(str_id, size, flags));
+        JS_FreeCString(ctx, str_id);
+        break;
+      }
+      case IMGUI_ARROW_BUTTON: {
+        const char* str_id = JS_ToCString(ctx, argv[0]);
+        int32_t dir = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &dir, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::ArrowButton(str_id, dir));
+        JS_FreeCString(ctx, str_id);
+        break;
+      }
+      case IMGUI_IMAGE: {
+        ImTextureID tex = js_imgui_gettexture(ctx, argv[0]);
+        ImVec2 size = js_imgui_getimvec2(ctx, argv[1]);
+        ImVec2 uv0(0, 0), uv1(1, 1);
+        ImVec4 tint_col(1, 1, 1, 1), border_col(0, 0, 0, 0);
+        if(argc >= 3)
+          uv0 = js_imgui_getimvec2(ctx, argv[2]);
+        if(argc >= 4)
+          uv1 = js_imgui_getimvec2(ctx, argv[3]);
+        if(argc >= 5)
+          tint_col = js_imgui_getimvec4(ctx, argv[4]);
+        if(argc >= 6)
+          border_col = js_imgui_getimvec4(ctx, argv[5]);
+        ImGui::Image(tex, size, uv0, uv1, tint_col, border_col);
+        break;
+      }
+      case IMGUI_IMAGE_BUTTON: {
+        ImTextureID tex = js_imgui_gettexture(ctx, argv[0]);
+        ImVec2 size = js_imgui_getimvec2(ctx, argv[1]);
+        ImVec2 uv0(0, 0), uv1(1, 1);
+        int32_t frame_padding = -1;
+        ImVec4 tint_col(1, 1, 1, 1), border_col(0, 0, 0, 0);
+        if(argc >= 3)
+          uv0 = js_imgui_getimvec2(ctx, argv[2]);
+        if(argc >= 4)
+          uv1 = js_imgui_getimvec2(ctx, argv[3]);
+        if(argc >= 5)
+          JS_ToInt32(ctx, &frame_padding, argv[4]);
+        if(argc >= 6)
+          tint_col = js_imgui_getimvec4(ctx, argv[5]);
+        if(argc >= 7)
+          border_col = js_imgui_getimvec4(ctx, argv[6]);
+        ret = JS_NewBool(ctx, ImGui::ImageButton(tex, size, uv0, uv1, frame_padding, tint_col, border_col));
+        break;
+      }
+      case IMGUI_CHECKBOX: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<bool> p_checked(ctx, argc > 1 ? argv[1] : JS_NULL);
 
-      ret = JS_NewBool(ctx, ImGui::CollapsingHeader(label, p_visible, flags));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_SET_NEXT_ITEM_OPEN: {
-      bool is_open = JS_ToBool(ctx, argv[0]);
-      int32_t flags = 0;
-      JS_ToInt32(ctx, &flags, argv[1]);
-      ImGui::SetNextItemOpen(is_open, flags);
-      break;
-    }
-    case IMGUI_SELECTABLE: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<bool> selected(ctx, argc >= 2 ? argv[1] : JS_NULL);
-      int32_t flags = 0;
-      ImVec2 size(0, 0);
-      if(argc >= 3)
-        JS_ToInt32(ctx, &flags, argv[2]);
-      if(argc >= 4)
-        size = js_imgui_getimvec2(ctx, argv[3]);
-      ret = JS_NewBool(ctx, ImGui::Selectable(label, selected, flags, size));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_BEGIN_LIST_BOX: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      ImVec2 size(0, 0);
-      if(argc >= 2)
-        size = js_imgui_getimvec2(ctx, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::BeginListBox(label, size));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_END_LIST_BOX: {
-      ImGui::EndListBox();
-      break;
-    }
-    case IMGUI_LIST_BOX: break;
-    case IMGUI_LIST_BOX_HEADER: break;
-    case IMGUI_LIST_BOX_FOOTER: break;
+        ret = JS_NewBool(ctx, ImGui::Checkbox(label, p_checked));
+        break;
+      }
+      case IMGUI_CHECKBOX_FLAGS: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        int64_t flags_value;
+        JS_ToInt64(ctx, &flags_value, argv[2]);
 
-    case IMGUI_PLOT_LINES: break;
-    case IMGUI_PLOT_HISTOGRAM: break;
-    case IMGUI_VALUE: {
-      const char* prefix = JS_ToCString(ctx, argv[0]);
-      if(JS_IsBool(argv[1])) {
-        ImGui::Value(prefix, static_cast<bool>(JS_ToBool(ctx, argv[1])));
-      } else if(JS_IsNumber(argv[1])) {
-        if(JS_VALUE_GET_TAG(argv[1]) == JS_TAG_FLOAT64) {
-          double f;
-          JS_ToFloat64(ctx, &f, argv[1]);
-          ImGui::Value(prefix, static_cast<float>(f));
+        if(flags_value < 0) {
+          OutputArg<int> p_flags(ctx, argv[1]);
+          ret = JS_NewBool(ctx, ImGui::CheckboxFlags(label, static_cast<int*>(p_flags), static_cast<int>(flags_value)));
         } else {
-          int64_t i64;
-          JS_ToInt64(ctx, &i64, argv[1]);
-          if(i64 >= 0)
-            ImGui::Value(prefix, static_cast<unsigned int>(i64));
-          else
-            ImGui::Value(prefix, static_cast<int>(i64));
+          OutputArg<unsigned int> p_flags(ctx, argv[1]);
+          ret = JS_NewBool(ctx, ImGui::CheckboxFlags(label, static_cast<unsigned int*>(p_flags), static_cast<unsigned int>(flags_value)));
         }
+
+        break;
       }
-      JS_FreeCString(ctx, prefix);
-      break;
-    }
-    case IMGUI_BEGIN_MAIN_MENU_BAR: {
-      ret = JS_NewBool(ctx, ImGui::BeginMainMenuBar());
-      break;
-    }
-    case IMGUI_END_MAIN_MENU_BAR: {
-      ImGui::EndMainMenuBar();
-      break;
-    }
-    case IMGUI_BEGIN_MENU_BAR: {
-      ret = JS_NewBool(ctx, ImGui::BeginMenuBar());
-      break;
-    }
-    case IMGUI_END_MENU_BAR: {
-      ImGui::EndMenuBar();
-      break;
-    }
-    case IMGUI_BEGIN_MENU: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      bool enabled = true;
-      if(argc >= 2)
-        enabled = JS_ToBool(ctx, argv[1]);
-
-      ret = JS_NewBool(ctx, ImGui::BeginMenu(label, enabled));
-
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_END_MENU: {
-      ImGui::EndMenu();
-      break;
-    }
-    case IMGUI_MENU_ITEM: {
-      const char *label = nullptr, *shortcut = nullptr;
-      BOOL enabled = TRUE;
-
-      if(argc > 0 && !(JS_IsNull(argv[0]) || JS_IsUndefined(argv[0])))
-        label = JS_ToCString(ctx, argv[0]);
-      if(argc > 1 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
-        shortcut = JS_ToCString(ctx, argv[1]);
-      if(argc > 3)
-        enabled = JS_ToBool(ctx, argv[3]);
-
-      if(argc < 3 || JS_IsBool(argv[2])) {
-        BOOL selected = argc > 2 && JS_IsBool(argv[2]) ? JS_ToBool(ctx, argv[2]) : FALSE;
-
-        ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, selected, enabled));
-      } else {
-        OutputArg<bool> p_selected(ctx, argc > 2 ? argv[2] : JS_NULL);
-
-        ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, static_cast<bool*>(p_selected), enabled));
-      }
-      if(label)
+      case IMGUI_RADIO_BUTTON: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        bool active = JS_ToBool(ctx, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::RadioButton(label, active));
         JS_FreeCString(ctx, label);
-      if(shortcut)
-        JS_FreeCString(ctx, shortcut);
-      break;
-    }
-    case IMGUI_BEGIN_TOOLTIP: {
-      ImGui::BeginTooltip();
-      break;
-    }
-    case IMGUI_END_TOOLTIP: {
-      ImGui::EndTooltip();
-      break;
-    }
-    case IMGUI_SET_TOOLTIP: {
-      int count = js_imgui_formatcount(ctx, argc, argv);
-      assert(count <= 32);
-      void* a[count];
-      js_imgui_formatargs(ctx, argc, argv, a);
-      ImGui::SetTooltip((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
-      break;
-    }
-    case IMGUI_OPEN_POPUP: {
-      if(JS_IsString(argv[0])) {
+        break;
+      }
+      case IMGUI_PROGRESS_BAR: {
+        double fraction;
+        ImVec2 size_arg(-FLT_MIN, 0);
+        const char* overlay = 0;
+        JS_ToFloat64(ctx, &fraction, argv[0]);
+        if(argc >= 2)
+          size_arg = js_imgui_getimvec2(ctx, argv[1]);
+        if(argc >= 3 && !(JS_IsNull(argv[2]) || JS_IsUndefined(argv[2])))
+          overlay = JS_ToCString(ctx, argv[2]);
+        ImGui::ProgressBar(fraction, size_arg, overlay);
+        if(overlay)
+          JS_FreeCString(ctx, overlay);
+        break;
+      }
+      case IMGUI_BULLET: {
+        ImGui::Bullet();
+        break;
+      }
+      case IMGUI_BEGIN_COMBO: {
+        const char *label = JS_ToCString(ctx, argv[0]), *preview_value = JS_ToCString(ctx, argv[1]);
+        int32_t flags = 0;
+        if(argc >= 3)
+          JS_ToInt32(ctx, &flags, argv[2]);
+        ret = JS_NewBool(ctx, ImGui::BeginCombo(label, preview_value, flags));
+        JS_FreeCString(ctx, label);
+        JS_FreeCString(ctx, preview_value);
+        break;
+      }
+      case IMGUI_END_COMBO: {
+        ImGui::EndCombo();
+        break;
+      }
+      case IMGUI_COMBO: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<int> p_value(ctx, argv[1]);
+        ItemsGetterUserData user_data = {ctx, argv[2]};
+        int32_t items_count = -1, popup_max_height_in_items = -1;
+        JS_ToInt32(ctx, &items_count, argv[3]);
+        if(argc > 4)
+          JS_ToInt32(ctx, &popup_max_height_in_items, argv[4]);
+
+        ret = JS_NewBool(ctx, ImGui::Combo(label, p_value, js_items_getter, &user_data, items_count, popup_max_height_in_items));
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_DRAG_FLOAT: break;
+      case IMGUI_DRAG_FLOAT2: break;
+      case IMGUI_DRAG_FLOAT3: break;
+      case IMGUI_DRAG_FLOAT4: break;
+      case IMGUI_DRAG_FLOAT_RANGE2: break;
+      case IMGUI_DRAG_INT: break;
+      case IMGUI_DRAG_INT2: break;
+      case IMGUI_DRAG_INT3: break;
+      case IMGUI_DRAG_INT4: break;
+      case IMGUI_DRAG_INT_RANGE2: break;
+      case IMGUI_DRAG_SCALAR: break;
+      case IMGUI_DRAG_SCALAR_N: break;
+      case IMGUI_SLIDER_FLOAT: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<float> p_value(ctx, argv[1]);
+        double vmin = 0, vmax = 1;
+        const char* format = 0;
+        int32_t flags = 0;
+
+        JS_ToFloat64(ctx, &vmin, argv[2]);
+        JS_ToFloat64(ctx, &vmax, argv[3]);
+        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+          format = JS_ToCString(ctx, argv[4]);
+        if(argc > 5)
+          JS_ToInt32(ctx, &flags, argv[5]);
+
+        ret = JS_NewBool(ctx, ImGui::SliderFloat(label, p_value, vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
+
+        if(format)
+          JS_FreeCString(ctx, format);
+        break;
+      }
+      case IMGUI_SLIDER_FLOAT2: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<std::array<float, 2>> p_values(ctx, argv[1]);
+        double vmin = 0, vmax = 1;
+        const char* format = 0;
+        int32_t flags = 0;
+
+        JS_ToFloat64(ctx, &vmin, argv[2]);
+        JS_ToFloat64(ctx, &vmax, argv[3]);
+        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+          format = JS_ToCString(ctx, argv[4]);
+        if(argc > 5)
+          JS_ToInt32(ctx, &flags, argv[5]);
+
+        ret = JS_NewBool(ctx, ImGui::SliderFloat2(label, static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
+
+        if(format)
+          JS_FreeCString(ctx, format);
+        break;
+      }
+      case IMGUI_SLIDER_FLOAT3: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<std::array<float, 3>> p_values(ctx, argv[1]);
+        double vmin = 0, vmax = 1;
+        const char* format = 0;
+        int32_t flags = 0;
+
+        JS_ToFloat64(ctx, &vmin, argv[2]);
+        JS_ToFloat64(ctx, &vmax, argv[3]);
+        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+          format = JS_ToCString(ctx, argv[4]);
+        if(argc > 5)
+          JS_ToInt32(ctx, &flags, argv[5]);
+
+        ret = JS_NewBool(ctx, ImGui::SliderFloat3(label, static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
+
+        if(format)
+          JS_FreeCString(ctx, format);
+        break;
+      }
+      case IMGUI_SLIDER_FLOAT4: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<std::array<float, 4>> p_values(ctx, argv[1]);
+        double vmin = 0, vmax = 1;
+        const char* format = 0;
+        int32_t flags = 0;
+
+        JS_ToFloat64(ctx, &vmin, argv[2]);
+        JS_ToFloat64(ctx, &vmax, argv[3]);
+        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+          format = JS_ToCString(ctx, argv[4]);
+        if(argc > 5)
+          JS_ToInt32(ctx, &flags, argv[5]);
+
+        ret = JS_NewBool(ctx, ImGui::SliderFloat3(label, static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
+
+        if(format)
+          JS_FreeCString(ctx, format);
+        break;
+      }
+      case IMGUI_SLIDER_ANGLE: break;
+      case IMGUI_SLIDER_INT: break;
+      case IMGUI_SLIDER_INT2: break;
+      case IMGUI_SLIDER_INT3: break;
+      case IMGUI_SLIDER_INT4: break;
+      case IMGUI_SLIDER_SCALAR: break;
+      case IMGUI_SLIDER_SCALAR_N: break;
+      case IMGUI_V_SLIDER_FLOAT: break;
+      case IMGUI_V_SLIDER_INT: break;
+      case IMGUI_V_SLIDER_SCALAR: break;
+      case IMGUI_INPUT_TEXT: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        uint32_t buf_size;
+        size_t size;
+        uint8_t* buffer;
+        int32_t flags = 0;
+        std::pair<ImGuiInputTextCallback, void*> cb = {nullptr, nullptr};
+        InputTextUserData context = {ctx, argv[1]};
+
+        if(!(buffer = JS_GetArrayBuffer(ctx, &size, argv[1]))) {
+          ret = JS_ThrowTypeError(ctx, "argument 2 must be an ArrayBuffer");
+          break;
+        }
+
+        buf_size = size;
+        if(argc > 2)
+          JS_ToUint32(ctx, &buf_size, argv[2]);
+        if(argc > 3)
+          JS_ToInt32(ctx, &flags, argv[3]);
+
+        if(argc > 4) {
+          if(!JS_IsFunction(ctx, argv[4])) {
+            ret = JS_ThrowTypeError(ctx, "argument 5 must be a Function");
+            break;
+          }
+          cb = js_imgui_input_text_args(ctx, context, argc - 4, argv + 4);
+        }
+
+        ret = JS_NewBool(ctx, ImGui::InputText(label, reinterpret_cast<char*>(buffer), buf_size, ImGuiInputTextFlags(flags), cb.first, cb.second));
+
+        break;
+      }
+      case IMGUI_INPUT_TEXT_MULTILINE: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        uint32_t buf_size;
+        size_t len;
+        uint8_t* buffer;
+        int32_t flags = 0;
+        std::pair<ImGuiInputTextCallback, void*> cb = {nullptr, nullptr};
+        InputTextUserData context = {ctx, argv[1]};
+        ImVec2 size(0, 0);
+
+        if(!(buffer = JS_GetArrayBuffer(ctx, &len, argv[1]))) {
+          ret = JS_ThrowTypeError(ctx, "argument 2 must be an ArrayBuffer");
+          break;
+        }
+
+        buf_size = len;
+        if(argc > 2)
+          JS_ToUint32(ctx, &buf_size, argv[2]);
+
+        if(argc > 3)
+          size = js_imgui_getimvec2(ctx, argv[3]);
+
+        if(argc > 4)
+          JS_ToInt32(ctx, &flags, argv[4]);
+
+        if(argc > 5) {
+          if(!JS_IsFunction(ctx, argv[5])) {
+            ret = JS_ThrowTypeError(ctx, "argument 6 must be a Function");
+            break;
+          }
+          cb = js_imgui_input_text_args(ctx, context, argc - 5, argv + 5);
+        }
+
+        ret = JS_NewBool(ctx, ImGui::InputTextMultiline(label, reinterpret_cast<char*>(buffer), buf_size, size, ImGuiInputTextFlags(flags), cb.first, cb.second));
+        break;
+      }
+      case IMGUI_INPUT_TEXT_WITH_HINT: break;
+      case IMGUI_INPUT_FLOAT: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<float> p_value(ctx, argv[1]);
+        double step = 0, step_fast = 0;
+        const char* format = 0;
+        int32_t flags = 0;
+
+        JS_ToFloat64(ctx, &step, argv[2]);
+        JS_ToFloat64(ctx, &step_fast, argv[3]);
+        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+          format = JS_ToCString(ctx, argv[4]);
+        if(argc > 5)
+          JS_ToInt32(ctx, &flags, argv[5]);
+
+        ret = JS_NewBool(ctx, ImGui::InputFloat(label, p_value, step, step_fast, format ? format : "%.3f", ImGuiInputTextFlags(flags)));
+
+        if(format)
+          JS_FreeCString(ctx, format);
+        break;
+      }
+      case IMGUI_INPUT_FLOAT2: break;
+      case IMGUI_INPUT_FLOAT3: break;
+      case IMGUI_INPUT_FLOAT4: break;
+      case IMGUI_INPUT_INT: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<int> p_value(ctx, argv[1]);
+        int32_t step = 0, step_fast = 0, flags = 0;
+
+        JS_ToInt32(ctx, &step, argv[2]);
+        JS_ToInt32(ctx, &step_fast, argv[3]);
+
+        if(argc > 4)
+          JS_ToInt32(ctx, &flags, argv[4]);
+
+        ret = JS_NewBool(ctx, ImGui::InputInt(label, p_value, step, step_fast, ImGuiInputTextFlags(flags)));
+        break;
+      }
+      case IMGUI_INPUT_INT2: break;
+      case IMGUI_INPUT_INT3: break;
+      case IMGUI_INPUT_INT4: break;
+      case IMGUI_INPUT_DOUBLE: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<double> p_value(ctx, argv[1]);
+        double step = 0, step_fast = 0;
+        const char* format = 0;
+        int32_t flags = 0;
+
+        JS_ToFloat64(ctx, &step, argv[2]);
+        JS_ToFloat64(ctx, &step_fast, argv[3]);
+
+        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+          format = JS_ToCString(ctx, argv[4]);
+        if(argc > 5)
+          JS_ToInt32(ctx, &flags, argv[5]);
+
+        ret = JS_NewBool(ctx, ImGui::InputDouble(label, p_value, step, step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
+
+        if(format)
+          JS_FreeCString(ctx, format);
+        break;
+      }
+      case IMGUI_INPUT_SCALAR: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<union ImGuiDataTypeUnion> p_value(ctx, argv[2]);
+        const char* format = 0;
+        int32_t type = 0, flags = 0;
+        union ImGuiDataTypeUnion scalar, step, step_fast;
+
+        JS_ToInt32(ctx, &type, argv[1]);
+
+        js_to_scalar(ctx, p_value, argv[2], type);
+        js_to_scalar(ctx, &step, argv[3], type);
+        js_to_scalar(ctx, &step_fast, argv[4], type);
+
+        if(argc > 5 && !(JS_IsUndefined(argv[5]) || JS_IsNull(argv[5])))
+          format = JS_ToCString(ctx, argv[5]);
+        if(argc > 6)
+          JS_ToInt32(ctx, &flags, argv[6]);
+
+        ret = JS_NewBool(ctx, ImGui::InputScalar(label, type, static_cast<union ImGuiDataTypeUnion*>(p_value), &step, &step_fast, format ? format : "%.6f", ImGuiInputTextFlags(flags)));
+
+        if(format)
+          JS_FreeCString(ctx, format);
+        break;
+      }
+      case IMGUI_INPUT_SCALAR_N: break;
+      case IMGUI_COLOR_EDIT3: break;
+      case IMGUI_COLOR_EDIT4: break;
+      case IMGUI_COLOR_PICKER3: break;
+      case IMGUI_COLOR_PICKER4: break;
+      case IMGUI_COLOR_BUTTON: break;
+      case IMGUI_SET_COLOR_EDIT_OPTIONS: {
+        int32_t options;
+        JS_ToInt32(ctx, &options, argv[0]);
+        ImGui::SetColorEditOptions(options);
+        break;
+      }
+      case IMGUI_TREE_NODE: {
+        if(argc > 1 /* && JS_IsString(argv[0])*/) {
+          const char* str_id = JS_ToCString(ctx, argv[0]);
+          int count = js_imgui_formatcount(ctx, argc - 1, argv + 1);
+          assert(count <= 32);
+          void* a[count];
+          js_imgui_formatargs(ctx, argc - 1, argv + 1, a);
+          ret = JS_NewBool(ctx, ImGui::TreeNode(str_id, (const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]));
+          JS_FreeCString(ctx, str_id);
+        } else {
+          const char* label = JS_ToCString(ctx, argv[0]);
+          ret = JS_NewBool(ctx, ImGui::TreeNode(label));
+          JS_FreeCString(ctx, label);
+        }
+        break;
+      }
+      case IMGUI_TREE_NODE_EX: {
+        int32_t flags = 0;
+        JS_ToInt32(ctx, &flags, argv[1]);
+
+        if(argc > 1 /* && JS_IsString(argv[0])*/) {
+          const char* str_id = JS_ToCString(ctx, argv[0]);
+          int count = js_imgui_formatcount(ctx, argc - 2, argv + 2);
+          assert(count <= 32);
+          void* a[count];
+          js_imgui_formatargs(ctx, argc - 2, argv + 2, a);
+          ret = JS_NewBool(ctx, ImGui::TreeNodeEx(str_id, flags, (const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]));
+          JS_FreeCString(ctx, str_id);
+        } else {
+          const char* label = JS_ToCString(ctx, argv[0]);
+          ret = JS_NewBool(ctx, ImGui::TreeNodeEx(label, flags));
+          JS_FreeCString(ctx, label);
+        }
+        break;
+      }
+      case IMGUI_TREE_PUSH: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        ImGui::TreePush(label);
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_TREE_POP: {
+        ImGui::TreePop();
+        break;
+      }
+      case IMGUI_GET_TREE_NODE_TO_LABEL_SPACING: {
+        ret = JS_NewFloat64(ctx, ImGui::GetTreeNodeToLabelSpacing());
+        break;
+      }
+      case IMGUI_COLLAPSING_HEADER: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        int32_t flags = 0;
+        OutputArg<bool> p_visible(ctx, argc >= 2 ? argv[1] : JS_NULL);
+        if(argc >= 3)
+          JS_ToInt32(ctx, &flags, argv[2]);
+
+        ret = JS_NewBool(ctx, ImGui::CollapsingHeader(label, p_visible, flags));
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_SET_NEXT_ITEM_OPEN: {
+        bool is_open = JS_ToBool(ctx, argv[0]);
+        int32_t flags = 0;
+        JS_ToInt32(ctx, &flags, argv[1]);
+        ImGui::SetNextItemOpen(is_open, flags);
+        break;
+      }
+      case IMGUI_SELECTABLE: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<bool> selected(ctx, argc >= 2 ? argv[1] : JS_NULL);
+        int32_t flags = 0;
+        ImVec2 size(0, 0);
+        if(argc >= 3)
+          JS_ToInt32(ctx, &flags, argv[2]);
+        if(argc >= 4)
+          size = js_imgui_getimvec2(ctx, argv[3]);
+        ret = JS_NewBool(ctx, ImGui::Selectable(label, selected, flags, size));
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_BEGIN_LIST_BOX: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        ImVec2 size(0, 0);
+        if(argc >= 2)
+          size = js_imgui_getimvec2(ctx, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::BeginListBox(label, size));
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_END_LIST_BOX: {
+        ImGui::EndListBox();
+        break;
+      }
+      case IMGUI_LIST_BOX: break;
+      case IMGUI_LIST_BOX_HEADER: break;
+      case IMGUI_LIST_BOX_FOOTER: break;
+
+      case IMGUI_PLOT_LINES: break;
+      case IMGUI_PLOT_HISTOGRAM: break;
+      case IMGUI_VALUE: {
+        const char* prefix = JS_ToCString(ctx, argv[0]);
+        if(JS_IsBool(argv[1])) {
+          ImGui::Value(prefix, static_cast<bool>(JS_ToBool(ctx, argv[1])));
+        } else if(JS_IsNumber(argv[1])) {
+          if(JS_VALUE_GET_TAG(argv[1]) == JS_TAG_FLOAT64) {
+            double f;
+            JS_ToFloat64(ctx, &f, argv[1]);
+            ImGui::Value(prefix, static_cast<float>(f));
+          } else {
+            int64_t i64;
+            JS_ToInt64(ctx, &i64, argv[1]);
+            if(i64 >= 0)
+              ImGui::Value(prefix, static_cast<unsigned int>(i64));
+            else
+              ImGui::Value(prefix, static_cast<int>(i64));
+          }
+        }
+        JS_FreeCString(ctx, prefix);
+        break;
+      }
+      case IMGUI_BEGIN_MAIN_MENU_BAR: {
+        ret = JS_NewBool(ctx, ImGui::BeginMainMenuBar());
+        break;
+      }
+      case IMGUI_END_MAIN_MENU_BAR: {
+        ImGui::EndMainMenuBar();
+        break;
+      }
+      case IMGUI_BEGIN_MENU_BAR: {
+        ret = JS_NewBool(ctx, ImGui::BeginMenuBar());
+        break;
+      }
+      case IMGUI_END_MENU_BAR: {
+        ImGui::EndMenuBar();
+        break;
+      }
+      case IMGUI_BEGIN_MENU: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        bool enabled = true;
+        if(argc >= 2)
+          enabled = JS_ToBool(ctx, argv[1]);
+
+        ret = JS_NewBool(ctx, ImGui::BeginMenu(label, enabled));
+
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_END_MENU: {
+        ImGui::EndMenu();
+        break;
+      }
+      case IMGUI_MENU_ITEM: {
+        const char *label = nullptr, *shortcut = nullptr;
+        BOOL enabled = TRUE;
+
+        if(argc > 0 && !(JS_IsNull(argv[0]) || JS_IsUndefined(argv[0])))
+          label = JS_ToCString(ctx, argv[0]);
+        if(argc > 1 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+          shortcut = JS_ToCString(ctx, argv[1]);
+        if(argc > 3)
+          enabled = JS_ToBool(ctx, argv[3]);
+
+        if(argc < 3 || JS_IsBool(argv[2])) {
+          BOOL selected = argc > 2 && JS_IsBool(argv[2]) ? JS_ToBool(ctx, argv[2]) : FALSE;
+
+          ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, selected, enabled));
+        } else {
+          OutputArg<bool> p_selected(ctx, argc > 2 ? argv[2] : JS_NULL);
+
+          ret = JS_NewBool(ctx, ImGui::MenuItem(label, shortcut, static_cast<bool*>(p_selected), enabled));
+        }
+        if(label)
+          JS_FreeCString(ctx, label);
+        if(shortcut)
+          JS_FreeCString(ctx, shortcut);
+        break;
+      }
+      case IMGUI_BEGIN_TOOLTIP: {
+        ImGui::BeginTooltip();
+        break;
+      }
+      case IMGUI_END_TOOLTIP: {
+        ImGui::EndTooltip();
+        break;
+      }
+      case IMGUI_SET_TOOLTIP: {
+        int count = js_imgui_formatcount(ctx, argc, argv);
+        assert(count <= 32);
+        void* a[count];
+        js_imgui_formatargs(ctx, argc, argv, a);
+        ImGui::SetTooltip((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
+        break;
+      }
+      case IMGUI_OPEN_POPUP: {
+        if(JS_IsString(argv[0])) {
+          const char* str_id = JS_ToCString(ctx, argv[0]);
+          int32_t flags = 0;
+          if(argc >= 2)
+            JS_ToInt32(ctx, &flags, argv[1]);
+          ImGui::OpenPopup(str_id, flags);
+          JS_FreeCString(ctx, str_id);
+        } else {
+          int32_t id;
+          JS_ToInt32(ctx, &id, argv[0]);
+          int32_t flags = 0;
+          if(argc >= 2)
+            JS_ToInt32(ctx, &flags, argv[1]);
+          ImGui::OpenPopup(id, flags);
+        }
+        break;
+      }
+      case IMGUI_BEGIN_POPUP: {
         const char* str_id = JS_ToCString(ctx, argv[0]);
         int32_t flags = 0;
         if(argc >= 2)
           JS_ToInt32(ctx, &flags, argv[1]);
-        ImGui::OpenPopup(str_id, flags);
+        ret = JS_NewBool(ctx, ImGui::BeginPopup(str_id, flags));
         JS_FreeCString(ctx, str_id);
-      } else {
-        int32_t id;
-        JS_ToInt32(ctx, &id, argv[0]);
+        break;
+      }
+      case IMGUI_BEGIN_POPUP_CONTEXT_ITEM: {
+        const char* str_id = 0;
+        int32_t flags = 1;
+        if(argc >= 1)
+          str_id = JS_ToCString(ctx, argv[0]);
+        if(argc >= 2)
+          JS_ToInt32(ctx, &flags, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::BeginPopupContextItem(str_id, flags));
+        if(str_id)
+          JS_FreeCString(ctx, str_id);
+        break;
+      }
+      case IMGUI_BEGIN_POPUP_CONTEXT_WINDOW: {
+        const char* str_id = 0;
+        int32_t flags = 1;
+        if(argc >= 1)
+          str_id = JS_ToCString(ctx, argv[0]);
+        if(argc >= 2)
+          JS_ToInt32(ctx, &flags, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::BeginPopupContextWindow(str_id, flags));
+        if(str_id)
+          JS_FreeCString(ctx, str_id);
+        break;
+      }
+      case IMGUI_BEGIN_POPUP_CONTEXT_VOID: {
+        const char* str_id = 0;
+        int32_t flags = 1;
+        if(argc >= 1)
+          str_id = JS_ToCString(ctx, argv[0]);
+        if(argc >= 2)
+          JS_ToInt32(ctx, &flags, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::BeginPopupContextVoid(str_id, flags));
+        if(str_id)
+          JS_FreeCString(ctx, str_id);
+        break;
+      }
+      case IMGUI_BEGIN_POPUP_MODAL: break;
+      case IMGUI_END_POPUP: {
+        ImGui::EndPopup();
+        break;
+      }
+      case IMGUI_OPEN_POPUP_ON_ITEM_CLICK: {
+        const char* str_id = 0;
+        int32_t flags = 1;
+        if(argc >= 1)
+          str_id = JS_ToCString(ctx, argv[0]);
+        if(argc >= 2)
+          JS_ToInt32(ctx, &flags, argv[1]);
+        ImGui::OpenPopupOnItemClick(str_id, flags);
+        if(str_id)
+          JS_FreeCString(ctx, str_id);
+        break;
+      }
+      case IMGUI_IS_POPUP_OPEN: {
+        const char* str_id = JS_ToCString(ctx, argv[0]);
         int32_t flags = 0;
         if(argc >= 2)
           JS_ToInt32(ctx, &flags, argv[1]);
-        ImGui::OpenPopup(id, flags);
-      }
-      break;
-    }
-    case IMGUI_BEGIN_POPUP: {
-      const char* str_id = JS_ToCString(ctx, argv[0]);
-      int32_t flags = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::BeginPopup(str_id, flags));
-      JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_BEGIN_POPUP_CONTEXT_ITEM: {
-      const char* str_id = 0;
-      int32_t flags = 1;
-      if(argc >= 1)
-        str_id = JS_ToCString(ctx, argv[0]);
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::BeginPopupContextItem(str_id, flags));
-      if(str_id)
+        ret = JS_NewBool(ctx, ImGui::IsPopupOpen(str_id, flags));
         JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_BEGIN_POPUP_CONTEXT_WINDOW: {
-      const char* str_id = 0;
-      int32_t flags = 1;
-      if(argc >= 1)
-        str_id = JS_ToCString(ctx, argv[0]);
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::BeginPopupContextWindow(str_id, flags));
-      if(str_id)
-        JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_BEGIN_POPUP_CONTEXT_VOID: {
-      const char* str_id = 0;
-      int32_t flags = 1;
-      if(argc >= 1)
-        str_id = JS_ToCString(ctx, argv[0]);
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::BeginPopupContextVoid(str_id, flags));
-      if(str_id)
-        JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_BEGIN_POPUP_MODAL: break;
-    case IMGUI_END_POPUP: {
-      ImGui::EndPopup();
-      break;
-    }
-    case IMGUI_OPEN_POPUP_ON_ITEM_CLICK: {
-      const char* str_id = 0;
-      int32_t flags = 1;
-      if(argc >= 1)
-        str_id = JS_ToCString(ctx, argv[0]);
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      ImGui::OpenPopupOnItemClick(str_id, flags);
-      if(str_id)
-        JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_IS_POPUP_OPEN: {
-      const char* str_id = JS_ToCString(ctx, argv[0]);
-      int32_t flags = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::IsPopupOpen(str_id, flags));
-      JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_BEGIN_TABLE: {
-      const char* str_id = JS_ToCString(ctx, argv[0]);
-      int32_t column, flags = 0;
-      ImVec2 outer_size(0, 0);
-      double inner_width = 0.0f;
-      JS_ToInt32(ctx, &column, argv[1]);
-      if(argc >= 3)
-        JS_ToInt32(ctx, &flags, argv[2]);
-      if(argc >= 4)
-        outer_size = js_imgui_getimvec2(ctx, argv[3]);
-      if(argc >= 5)
-        JS_ToFloat64(ctx, &inner_width, argv[4]);
-      ret = JS_NewBool(ctx, ImGui::BeginTable(str_id, column, flags, outer_size, inner_width));
-      JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_END_TABLE: {
-      ImGui::EndTable();
-      break;
-    }
-    case IMGUI_TABLE_NEXT_ROW: {
-      int32_t row_flags = 0;
-      double min_row_height = 0.0f;
-
-      if(argc >= 1)
-        JS_ToInt32(ctx, &row_flags, argv[0]);
-      if(argc >= 2)
-        JS_ToFloat64(ctx, &min_row_height, argv[1]);
-      ImGui::TableNextRow(row_flags, min_row_height);
-      break;
-    }
-    case IMGUI_TABLE_NEXT_COLUMN: {
-      ret = JS_NewBool(ctx, ImGui::TableNextColumn());
-      break;
-    }
-    case IMGUI_TABLE_SET_COLUMN_INDEX: {
-      int32_t column_index;
-      JS_ToInt32(ctx, &column_index, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::TableSetColumnIndex(column_index));
-      break;
-    }
-    case IMGUI_TABLE_SETUP_COLUMN: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      int32_t flags = 0, user_id = 0;
-      double init_width_or_weight = 0.0f;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      if(argc >= 3)
-        JS_ToFloat64(ctx, &init_width_or_weight, argv[2]);
-      if(argc >= 4)
-        JS_ToInt32(ctx, &user_id, argv[3]);
-      ImGui::TableSetupColumn(label, flags, init_width_or_weight, user_id);
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_TABLE_SETUP_SCROLL_FREEZE: {
-      int32_t cols, rows;
-      JS_ToInt32(ctx, &cols, argv[0]);
-      JS_ToInt32(ctx, &rows, argv[1]);
-      ImGui::TableSetupScrollFreeze(cols, rows);
-      break;
-    }
-    case IMGUI_TABLE_HEADERS_ROW: {
-      ImGui::TableHeadersRow();
-      break;
-    }
-    case IMGUI_TABLE_HEADER: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-
-      ImGui::TableHeader(label);
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_TABLE_GET_SORT_SPECS: break;
-    case IMGUI_TABLE_GET_COLUMN_COUNT: {
-      ret = JS_NewUint32(ctx, ImGui::TableGetColumnCount());
-      break;
-    }
-    case IMGUI_TABLE_GET_COLUMN_INDEX: {
-      ret = JS_NewInt32(ctx, ImGui::TableGetColumnIndex());
-      break;
-    }
-    case IMGUI_TABLE_GET_ROW_INDEX: {
-      ret = JS_NewInt32(ctx, ImGui::TableGetRowIndex());
-      break;
-    }
-    case IMGUI_TABLE_GET_COLUMN_NAME: {
-      int32_t col = -1;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &col, argv[0]);
-      ret = JS_NewString(ctx, ImGui::TableGetColumnName(col));
-      break;
-    }
-    case IMGUI_TABLE_GET_COLUMN_FLAGS: {
-      int32_t col = -1;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &col, argv[0]);
-      ret = JS_NewInt32(ctx, ImGui::TableGetColumnFlags(col));
-      break;
-    }
-    case IMGUI_TABLE_SET_COLUMN_ENABLED: {
-      int32_t col;
-      JS_ToInt32(ctx, &col, argv[0]);
-      ImGui::TableSetColumnEnabled(col, JS_ToBool(ctx, argv[1]));
-      break;
-    }
-    case IMGUI_TABLE_SET_BG_COLOR: break;
-    case IMGUI_BUILD_LOOKUP_TABLE: break;
-    case IMGUI_CLOSE_CURRENT_POPUP: {
-      ImGui::CloseCurrentPopup();
-      break;
-    }
-    case IMGUI_COLUMNS: {
-      int32_t count = 1;
-      const char* id = 0;
-      bool border = true;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &count, argv[0]);
-      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
-        id = JS_ToCString(ctx, argv[1]);
-      if(argc >= 3)
-        border = JS_ToBool(ctx, argv[2]);
-      ImGui::Columns(count, id, border);
-      if(id)
-        JS_FreeCString(ctx, id);
-      break;
-    }
-    case IMGUI_NEXT_COLUMN: {
-      ImGui::NextColumn();
-      break;
-    }
-    case IMGUI_GET_COLUMN_INDEX: {
-      ret = JS_NewInt32(ctx, ImGui::GetColumnIndex());
-      break;
-    }
-    case IMGUI_GET_COLUMN_WIDTH: {
-      int32_t col = -1;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &col, argv[0]);
-      ret = JS_NewFloat64(ctx, ImGui::GetColumnWidth(col));
-      break;
-    }
-    case IMGUI_SET_COLUMN_WIDTH: {
-      int32_t col;
-      double width;
-      JS_ToInt32(ctx, &col, argv[0]);
-      JS_ToFloat64(ctx, &width, argv[1]);
-      ImGui::SetColumnWidth(col, width);
-      break;
-    }
-    case IMGUI_GET_COLUMN_OFFSET: {
-      int32_t col = -1;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &col, argv[0]);
-      ret = JS_NewFloat64(ctx, ImGui::GetColumnOffset(col));
-      break;
-    }
-    case IMGUI_SET_COLUMN_OFFSET: {
-      int32_t col;
-      double offset_x;
-      JS_ToInt32(ctx, &col, argv[0]);
-      JS_ToFloat64(ctx, &offset_x, argv[1]);
-      ImGui::SetColumnOffset(col, offset_x);
-      break;
-    }
-    case IMGUI_GET_COLUMNS_COUNT: {
-      ret = JS_NewUint32(ctx, ImGui::GetColumnsCount());
-      break;
-    }
-    case IMGUI_BEGIN_TAB_BAR: {
-      const char* str_id = JS_ToCString(ctx, argv[0]);
-      int32_t flags = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::BeginTabBar(str_id, flags));
-      JS_FreeCString(ctx, str_id);
-      break;
-    }
-    case IMGUI_END_TAB_BAR: {
-      ImGui::EndTabBar();
-      break;
-    }
-    case IMGUI_BEGIN_TAB_ITEM: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      OutputArg<bool> p_open(ctx, argc >= 2 ? argv[1] : JS_NULL);
-      int32_t flags = 0;
-      if(argc >= 3)
-        JS_ToInt32(ctx, &flags, argv[2]);
-      ret = JS_NewBool(ctx, ImGui::BeginTabItem(label, p_open, flags));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_END_TAB_ITEM: {
-      ImGui::EndTabItem();
-      break;
-    }
-    case IMGUI_TAB_ITEM_BUTTON: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      int32_t flags = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::TabItemButton(label, flags));
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_SET_TAB_ITEM_CLOSED: {
-      const char* label = JS_ToCString(ctx, argv[0]);
-      ImGui::SetTabItemClosed(label);
-      JS_FreeCString(ctx, label);
-      break;
-    }
-    case IMGUI_LOG_TO_TTY: {
-      int32_t auto_open_depth = -1;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &auto_open_depth, argv[0]);
-      ImGui::LogToTTY(auto_open_depth);
-      break;
-    }
-    case IMGUI_LOG_TO_FILE: {
-      int32_t auto_open_depth = -1;
-      const char* filename = 0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &auto_open_depth, argv[0]);
-      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
-        filename = JS_ToCString(ctx, argv[1]);
-      ImGui::LogToFile(auto_open_depth, filename);
-      if(filename)
-        JS_FreeCString(ctx, filename);
-      break;
-    }
-    case IMGUI_LOG_TO_CLIPBOARD: {
-      int32_t auto_open_depth = -1;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &auto_open_depth, argv[0]);
-      ImGui::LogToClipboard(auto_open_depth);
-      break;
-    }
-    case IMGUI_LOG_FINISH: {
-      ImGui::LogFinish();
-      break;
-    }
-    case IMGUI_LOG_BUTTONS: {
-      ImGui::LogButtons();
-      break;
-    }
-    case IMGUI_LOG_TEXT: {
-      int count = js_imgui_formatcount(ctx, argc, argv);
-      assert(count <= 32);
-      void* a[count];
-      js_imgui_formatargs(ctx, argc, argv, a);
-      ImGui::LogText((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
-      break;
-    }
-    case IMGUI_BEGIN_DRAG_DROP_SOURCE: {
-      int32_t flags = 0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &flags, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::BeginDragDropSource(flags));
-      break;
-    }
-    case IMGUI_SET_DRAG_DROP_PAYLOAD: {
-      const char* type = JS_ToCString(ctx, argv[0]);
-      uint8_t* ptr;
-      size_t len;
-      int32_t cond = 0;
-      if(argc >= 3)
-        JS_ToInt32(ctx, &cond, argv[2]);
-      ptr = JS_GetArrayBuffer(ctx, &len, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::SetDragDropPayload(type, ptr, len, cond));
-      JS_FreeCString(ctx, type);
-      break;
-    }
-    case IMGUI_END_DRAG_DROP_SOURCE: {
-      ImGui::EndDragDropSource();
-      break;
-    }
-    case IMGUI_BEGIN_DRAG_DROP_TARGET: {
-      ret = JS_NewBool(ctx, ImGui::BeginDragDropTarget());
-      break;
-    }
-    case IMGUI_ACCEPT_DRAG_DROP_PAYLOAD: {
-      const char* type = JS_ToCString(ctx, argv[0]);
-      int32_t flags = 0;
-      if(argc >= 2)
-        JS_ToInt32(ctx, &flags, argv[1]);
-      ret = js_imgui_payload_wrap(ctx, new ImGuiPayload(*ImGui::AcceptDragDropPayload(type, flags)));
-      JS_FreeCString(ctx, type);
-      break;
-    }
-    case IMGUI_END_DRAG_DROP_TARGET: {
-      ImGui::EndDragDropTarget();
-      break;
-    }
-    case IMGUI_GET_DRAG_DROP_PAYLOAD: {
-      ret = js_imgui_payload_wrap(ctx, new ImGuiPayload(*ImGui::GetDragDropPayload()));
-      break;
-    }
-    case IMGUI_BEGIN_DISABLED: {
-      bool disabled = true;
-      if(argc >= 1)
-        disabled = JS_ToBool(ctx, argv[0]);
-      ImGui::BeginDisabled(disabled);
-      break;
-    }
-    case IMGUI_END_DISABLED: {
-      ImGui::EndDisabled();
-      break;
-    }
-    case IMGUI_PUSH_CLIP_RECT: {
-      ImVec2 clip_rect_min = js_imgui_getimvec2(ctx, argv[0]), clip_rect_max = js_imgui_getimvec2(ctx, argv[1]);
-      bool intersect_with_current_clip_rect = JS_ToBool(ctx, argv[2]);
-      ImGui::PushClipRect(clip_rect_min, clip_rect_max, intersect_with_current_clip_rect);
-      break;
-    }
-    case IMGUI_POP_CLIP_RECT: {
-      ImGui::PopClipRect();
-      break;
-    }
-    case IMGUI_SET_ITEM_DEFAULT_FOCUS: {
-      ImGui::SetItemDefaultFocus();
-      break;
-    }
-    case IMGUI_SET_KEYBOARD_FOCUS_HERE: {
-      int32_t offset = 0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &offset, argv[0]);
-      ImGui::SetKeyboardFocusHere(offset);
-      break;
-    }
-    case IMGUI_IS_ITEM_HOVERED: {
-      int32_t flags = 0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &flags, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsItemHovered(flags));
-      break;
-    }
-    case IMGUI_IS_ITEM_ACTIVE: {
-      ret = JS_NewBool(ctx, ImGui::IsItemActive());
-      break;
-    }
-    case IMGUI_IS_ITEM_FOCUSED: {
-      ret = JS_NewBool(ctx, ImGui::IsItemFocused());
-      break;
-    }
-    case IMGUI_IS_ITEM_CLICKED: {
-      int32_t mouse_button = 0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &mouse_button, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsItemClicked(mouse_button));
-      break;
-    }
-    case IMGUI_IS_ITEM_VISIBLE: {
-      ret = JS_NewBool(ctx, ImGui::IsItemVisible());
-      break;
-    }
-    case IMGUI_IS_ITEM_EDITED: {
-      ret = JS_NewBool(ctx, ImGui::IsItemEdited());
-      break;
-    }
-    case IMGUI_IS_ITEM_ACTIVATED: {
-      ret = JS_NewBool(ctx, ImGui::IsItemActivated());
-      break;
-    }
-    case IMGUI_IS_ITEM_DEACTIVATED: {
-      ret = JS_NewBool(ctx, ImGui::IsItemDeactivated());
-      break;
-    }
-    case IMGUI_IS_ITEM_DEACTIVATED_AFTER_EDIT: {
-      ret = JS_NewBool(ctx, ImGui::IsItemDeactivatedAfterEdit());
-      break;
-    }
-    case IMGUI_IS_ANY_ITEM_HOVERED: {
-      ret = JS_NewBool(ctx, ImGui::IsAnyItemHovered());
-      break;
-    }
-    case IMGUI_IS_ANY_ITEM_ACTIVE: {
-      ret = JS_NewBool(ctx, ImGui::IsAnyItemActive());
-      break;
-    }
-    case IMGUI_IS_ANY_ITEM_FOCUSED: {
-      ret = JS_NewBool(ctx, ImGui::IsAnyItemFocused());
-      break;
-    }
-    case IMGUI_GET_ITEM_RECT_MIN: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetItemRectMin());
-      break;
-    }
-    case IMGUI_GET_ITEM_RECT_MAX: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetItemRectMax());
-      break;
-    }
-    case IMGUI_GET_ITEM_RECT_SIZE: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetItemRectSize());
-      break;
-    }
-    case IMGUI_SET_ITEM_ALLOW_OVERLAP: {
-      ImGui::SetItemAllowOverlap();
-      break;
-    }
-    case IMGUI_IS_RECT_VISIBLE: {
-      if(argc >= 2) {
-        ImVec2 rect_min = js_imgui_getimvec2(ctx, argv[0]), rect_max = js_imgui_getimvec2(ctx, argv[1]);
-        ret = JS_NewBool(ctx, ImGui::IsRectVisible(rect_min, rect_max));
-      } else {
-        ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
-        ret = JS_NewBool(ctx, ImGui::IsRectVisible(size));
+        break;
       }
-      break;
-    }
-    case IMGUI_GET_TIME: {
-      ret = JS_NewFloat64(ctx, ImGui::GetTime());
-      break;
-    }
-    case IMGUI_GET_FRAME_COUNT: {
-      ret = JS_NewInt64(ctx, ImGui::GetFrameCount());
-      break;
-    }
-    case IMGUI_GET_BACKGROUND_DRAW_LIST: break;
-    case IMGUI_GET_FOREGROUND_DRAW_LIST: break;
-    case IMGUI_GET_DRAW_LIST_SHARED_DATA: break;
-    case IMGUI_GET_STYLE_COLOR_NAME: {
-      int32_t idx;
-      JS_ToInt32(ctx, &idx, argv[0]);
-      ret = JS_NewString(ctx, ImGui::GetStyleColorName(idx));
-      break;
-    }
-    case IMGUI_SET_STATE_STORAGE: break;
-    case IMGUI_GET_STATE_STORAGE: break;
-    case IMGUI_CALC_TEXT_SIZE: {
-      const char *text = JS_ToCString(ctx, argv[0]), *text_end = 0;
-      bool hide_text_after_double_hash = false;
-      double wrap_width = -1.0f;
-      if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
-        text_end = JS_ToCString(ctx, argv[1]);
-      if(argc >= 3)
-        hide_text_after_double_hash = JS_ToBool(ctx, argv[2]);
-      if(argc >= 4)
-        JS_ToFloat64(ctx, &wrap_width, argv[3]);
-      ret = js_imgui_newimvec2(ctx, ImGui::CalcTextSize(text, text_end, hide_text_after_double_hash, wrap_width));
-      JS_FreeCString(ctx, text);
-      if(text_end)
-        JS_FreeCString(ctx, text_end);
-      break;
-    }
-    case IMGUI_CALC_LIST_CLIPPING: break;
-    case IMGUI_BEGIN_CHILD_FRAME: {
-      int32_t id, window_flags = 0;
-      ImVec2 size = js_imgui_getimvec2(ctx, argv[1]);
-      JS_ToInt32(ctx, &id, argv[0]);
-      if(argc >= 3)
-        JS_ToInt32(ctx, &window_flags, argv[2]);
-      ret = JS_NewBool(ctx, ImGui::BeginChildFrame(id, size, window_flags));
-      break;
-    }
-    case IMGUI_END_CHILD_FRAME: {
-      ImGui::EndChildFrame();
-      break;
-    }
-    case IMGUI_COLOR_CONVERTU32_TO_FLOAT4: {
-      uint32_t in;
-      JS_ToUint32(ctx, &in, argv[0]);
-      ret = js_imgui_newimvec4(ctx, ImGui::ColorConvertU32ToFloat4(in));
-      break;
-    }
-    case IMGUI_COLOR_CONVERT_FLOAT4_TOU32: {
-      ImVec4 in = js_imgui_getimvec4(ctx, argv[0]);
-      ret = JS_NewUint32(ctx, ImGui::ColorConvertFloat4ToU32(in));
-      break;
-    }
-    case IMGUI_COLOR_CONVERT_RGB_TO_HSV: {
-      double r, g, b;
-      float h, s, v;
-      JS_ToFloat64(ctx, &r, argv[0]);
-      JS_ToFloat64(ctx, &g, argv[1]);
-      JS_ToFloat64(ctx, &b, argv[2]);
-      ImGui::ColorConvertRGBtoHSV(r, g, b, h, s, v);
-      ret = JS_NewArray(ctx);
-      JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, h));
-      JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, s));
-      JS_SetPropertyUint32(ctx, ret, 2, JS_NewFloat64(ctx, v));
-      break;
-    }
-    case IMGUI_COLOR_CONVERT_HSV_TO_RGB: {
-      double h, s, v;
-      float r, g, b;
-      JS_ToFloat64(ctx, &h, argv[0]);
-      JS_ToFloat64(ctx, &s, argv[1]);
-      JS_ToFloat64(ctx, &v, argv[2]);
-      ImGui::ColorConvertHSVtoRGB(h, s, v, r, g, b);
-      ret = JS_NewArray(ctx);
-      JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, r));
-      JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, g));
-      JS_SetPropertyUint32(ctx, ret, 2, JS_NewFloat64(ctx, b));
-      break;
-    }
-    case IMGUI_GET_KEY_INDEX: {
-      int32_t imgui_key;
-      JS_ToInt32(ctx, &imgui_key, argv[0]);
-      ret = JS_NewInt32(ctx, ImGui::GetKeyIndex(imgui_key));
-      break;
-    }
-    case IMGUI_IS_KEY_DOWN: {
-      int32_t user_key_index;
-      JS_ToInt32(ctx, &user_key_index, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsKeyDown(user_key_index));
-      break;
-    }
-    case IMGUI_IS_KEY_PRESSED: {
-      int32_t user_key_index;
-      bool repeat = true;
-      if(argc >= 2)
-        repeat = JS_ToBool(ctx, argv[1]);
-      JS_ToInt32(ctx, &user_key_index, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsKeyPressed(user_key_index, repeat));
-      break;
-    }
-    case IMGUI_IS_KEY_RELEASED: {
-      int32_t user_key_index;
-      JS_ToInt32(ctx, &user_key_index, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsKeyReleased(user_key_index));
-      break;
-    }
-    case IMGUI_GET_KEY_PRESSED_AMOUNT: {
-      int32_t key_index;
-      double repeat_delay, rate;
-      JS_ToInt32(ctx, &key_index, argv[0]);
-      JS_ToFloat64(ctx, &repeat_delay, argv[1]);
-      JS_ToFloat64(ctx, &rate, argv[2]);
-      ret = JS_NewInt32(ctx, ImGui::GetKeyPressedAmount(key_index, repeat_delay, rate));
-      break;
-    }
-    case IMGUI_IS_MOUSE_DOWN: {
-      int32_t button;
-      JS_ToInt32(ctx, &button, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsMouseDown(button));
-      break;
-    }
-    case IMGUI_IS_ANY_MOUSE_DOWN: {
-      ret = JS_NewBool(ctx, ImGui::IsAnyMouseDown());
-      break;
-    }
-    case IMGUI_IS_MOUSE_CLICKED: {
-      int32_t button;
-      bool repeat = true;
-      if(argc >= 2)
-        repeat = JS_ToBool(ctx, argv[1]);
-      JS_ToInt32(ctx, &button, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsMouseClicked(button, repeat));
-      break;
-    }
-    case IMGUI_IS_MOUSE_DOUBLE_CLICKED: {
-      int32_t button;
-      JS_ToInt32(ctx, &button, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsMouseDoubleClicked(button));
-      break;
-    }
-    case IMGUI_IS_MOUSE_RELEASED: {
-      int32_t button;
-      JS_ToInt32(ctx, &button, argv[0]);
-      ret = JS_NewBool(ctx, ImGui::IsMouseReleased(button));
-      break;
-    }
-    case IMGUI_IS_MOUSE_DRAGGING: {
-      int32_t button;
-      double lock_threshold = -1.0;
-      JS_ToInt32(ctx, &button, argv[0]);
-      if(argc >= 2)
-        JS_ToFloat64(ctx, &lock_threshold, argv[1]);
-      ret = JS_NewBool(ctx, ImGui::IsMouseDragging(button, lock_threshold));
-      break;
-    }
-    case IMGUI_IS_MOUSE_HOVERING_RECT: {
-      ImVec2 r_min = js_imgui_getimvec2(ctx, argv[0]), r_max = js_imgui_getimvec2(ctx, argv[1]);
-      bool clip = true;
-      if(argc >= 3)
-        clip = JS_ToBool(ctx, argv[2]);
-      ret = JS_NewBool(ctx, ImGui::IsMouseHoveringRect(r_min, r_max, clip));
-      break;
-    }
-    case IMGUI_IS_MOUSE_POS_VALID: {
-      const ImVec2* ptr = 0;
-      ImVec2 pos;
-      if(argc >= 1) {
-        pos = js_imgui_getimvec2(ctx, argv[0]);
-        ptr = &pos;
+      case IMGUI_BEGIN_TABLE: {
+        const char* str_id = JS_ToCString(ctx, argv[0]);
+        int32_t column, flags = 0;
+        ImVec2 outer_size(0, 0);
+        double inner_width = 0.0f;
+        JS_ToInt32(ctx, &column, argv[1]);
+        if(argc >= 3)
+          JS_ToInt32(ctx, &flags, argv[2]);
+        if(argc >= 4)
+          outer_size = js_imgui_getimvec2(ctx, argv[3]);
+        if(argc >= 5)
+          JS_ToFloat64(ctx, &inner_width, argv[4]);
+        ret = JS_NewBool(ctx, ImGui::BeginTable(str_id, column, flags, outer_size, inner_width));
+        JS_FreeCString(ctx, str_id);
+        break;
       }
-      ret = JS_NewBool(ctx, ImGui::IsMousePosValid(ptr));
-      break;
-    }
-    case IMGUI_GET_MOUSE_POS: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetMousePos());
-      break;
-    }
-    case IMGUI_GET_MOUSE_POS_ON_OPENING_CURRENT_POPUP: {
-      ret = js_imgui_newimvec2(ctx, ImGui::GetMousePosOnOpeningCurrentPopup());
-      break;
-    }
-    case IMGUI_GET_MOUSE_DRAG_DELTA: {
-      int32_t mouse_button = 0;
-      double lock_threshold = -1.0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &mouse_button, argv[0]);
-      if(argc >= 2)
-        JS_ToFloat64(ctx, &lock_threshold, argv[1]);
-      ret = js_imgui_newimvec2(ctx, ImGui::GetMouseDragDelta(mouse_button, lock_threshold));
-      break;
-    }
-    case IMGUI_RESET_MOUSE_DRAG_DELTA: {
-      int32_t mouse_button = 0;
-      if(argc >= 1)
-        JS_ToInt32(ctx, &mouse_button, argv[0]);
-      ImGui::ResetMouseDragDelta(mouse_button);
-      break;
-    }
-    case IMGUI_GET_MOUSE_CURSOR: {
-      ret = JS_NewInt32(ctx, ImGui::GetMouseCursor());
-      break;
-    }
-    case IMGUI_SET_MOUSE_CURSOR: {
-      int32_t mouse_cursor;
-      JS_ToInt32(ctx, &mouse_cursor, argv[0]);
-      ImGui::SetMouseCursor(mouse_cursor);
-      break;
-    }
-    case IMGUI_CAPTURE_KEYBOARD_FROM_APP: {
-      bool want_capture = true;
-      if(argc >= 1)
-        want_capture = JS_ToBool(ctx, argv[0]);
-      ImGui::CaptureKeyboardFromApp(want_capture);
-      break;
-    }
-    case IMGUI_CAPTURE_MOUSE_FROM_APP: {
-      bool want_capture = true;
-      if(argc >= 1)
-        want_capture = JS_ToBool(ctx, argv[0]);
-      ImGui::CaptureMouseFromApp(want_capture);
-      break;
-    }
-    case IMGUI_GET_CLIPBOARD_TEXT: {
-      ret = JS_NewString(ctx, ImGui::GetClipboardText());
-      break;
-    }
-    case IMGUI_SET_CLIPBOARD_TEXT: {
-      const char* text = JS_ToCString(ctx, argv[0]);
-      ImGui::SetClipboardText(text);
-      JS_FreeCString(ctx, text);
-
-      break;
-    }
-    case IMGUI_LOAD_INI_SETTINGS_FROM_DISK: {
-      const char* file = JS_ToCString(ctx, argv[0]);
-      ImGui::LoadIniSettingsFromDisk(file);
-      JS_FreeCString(ctx, file);
-      break;
-    }
-    case IMGUI_LOAD_INI_SETTINGS_FROM_MEMORY: {
-      uint8_t* ptr;
-      size_t len;
-      if(JS_IsString(argv[0])) {
-        const char* data = JS_ToCStringLen(ctx, &len, argv[0]);
-        ImGui::LoadIniSettingsFromMemory(data, len);
-        JS_FreeCString(ctx, data);
-      } else if((ptr = JS_GetArrayBuffer(ctx, &len, argv[0]))) {
-        ImGui::LoadIniSettingsFromMemory(reinterpret_cast<const char*>(ptr), len);
-      } else {
-        ret = JS_ThrowInternalError(ctx, "argument 1 is neither String nor ArrayBuffer");
+      case IMGUI_END_TABLE: {
+        ImGui::EndTable();
+        break;
       }
-      break;
-    }
-    case IMGUI_SAVE_INI_SETTINGS_TO_DISK: {
-      const char* file = JS_ToCString(ctx, argv[0]);
-      ImGui::SaveIniSettingsToDisk(file);
-      JS_FreeCString(ctx, file);
-      break;
-    }
-    case IMGUI_SAVE_INI_SETTINGS_TO_MEMORY: {
-      size_t len;
-      const char* data = ImGui::SaveIniSettingsToMemory(&len);
+      case IMGUI_TABLE_NEXT_ROW: {
+        int32_t row_flags = 0;
+        double min_row_height = 0.0f;
 
-      ret = JS_NewArrayBufferCopy(ctx, reinterpret_cast<const uint8_t*>(data), len);
-      break;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &row_flags, argv[0]);
+        if(argc >= 2)
+          JS_ToFloat64(ctx, &min_row_height, argv[1]);
+        ImGui::TableNextRow(row_flags, min_row_height);
+        break;
+      }
+      case IMGUI_TABLE_NEXT_COLUMN: {
+        ret = JS_NewBool(ctx, ImGui::TableNextColumn());
+        break;
+      }
+      case IMGUI_TABLE_SET_COLUMN_INDEX: {
+        int32_t column_index;
+        JS_ToInt32(ctx, &column_index, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::TableSetColumnIndex(column_index));
+        break;
+      }
+      case IMGUI_TABLE_SETUP_COLUMN: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        int32_t flags = 0, user_id = 0;
+        double init_width_or_weight = 0.0f;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &flags, argv[1]);
+        if(argc >= 3)
+          JS_ToFloat64(ctx, &init_width_or_weight, argv[2]);
+        if(argc >= 4)
+          JS_ToInt32(ctx, &user_id, argv[3]);
+        ImGui::TableSetupColumn(label, flags, init_width_or_weight, user_id);
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_TABLE_SETUP_SCROLL_FREEZE: {
+        int32_t cols, rows;
+        JS_ToInt32(ctx, &cols, argv[0]);
+        JS_ToInt32(ctx, &rows, argv[1]);
+        ImGui::TableSetupScrollFreeze(cols, rows);
+        break;
+      }
+      case IMGUI_TABLE_HEADERS_ROW: {
+        ImGui::TableHeadersRow();
+        break;
+      }
+      case IMGUI_TABLE_HEADER: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+
+        ImGui::TableHeader(label);
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_TABLE_GET_SORT_SPECS: break;
+      case IMGUI_TABLE_GET_COLUMN_COUNT: {
+        ret = JS_NewUint32(ctx, ImGui::TableGetColumnCount());
+        break;
+      }
+      case IMGUI_TABLE_GET_COLUMN_INDEX: {
+        ret = JS_NewInt32(ctx, ImGui::TableGetColumnIndex());
+        break;
+      }
+      case IMGUI_TABLE_GET_ROW_INDEX: {
+        ret = JS_NewInt32(ctx, ImGui::TableGetRowIndex());
+        break;
+      }
+      case IMGUI_TABLE_GET_COLUMN_NAME: {
+        int32_t col = -1;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &col, argv[0]);
+        ret = JS_NewString(ctx, ImGui::TableGetColumnName(col));
+        break;
+      }
+      case IMGUI_TABLE_GET_COLUMN_FLAGS: {
+        int32_t col = -1;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &col, argv[0]);
+        ret = JS_NewInt32(ctx, ImGui::TableGetColumnFlags(col));
+        break;
+      }
+      case IMGUI_TABLE_SET_COLUMN_ENABLED: {
+        int32_t col;
+        JS_ToInt32(ctx, &col, argv[0]);
+        ImGui::TableSetColumnEnabled(col, JS_ToBool(ctx, argv[1]));
+        break;
+      }
+      case IMGUI_TABLE_SET_BG_COLOR: break;
+      case IMGUI_BUILD_LOOKUP_TABLE: break;
+      case IMGUI_CLOSE_CURRENT_POPUP: {
+        ImGui::CloseCurrentPopup();
+        break;
+      }
+      case IMGUI_COLUMNS: {
+        int32_t count = 1;
+        const char* id = 0;
+        bool border = true;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &count, argv[0]);
+        if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+          id = JS_ToCString(ctx, argv[1]);
+        if(argc >= 3)
+          border = JS_ToBool(ctx, argv[2]);
+        ImGui::Columns(count, id, border);
+        if(id)
+          JS_FreeCString(ctx, id);
+        break;
+      }
+      case IMGUI_NEXT_COLUMN: {
+        ImGui::NextColumn();
+        break;
+      }
+      case IMGUI_GET_COLUMN_INDEX: {
+        ret = JS_NewInt32(ctx, ImGui::GetColumnIndex());
+        break;
+      }
+      case IMGUI_GET_COLUMN_WIDTH: {
+        int32_t col = -1;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &col, argv[0]);
+        ret = JS_NewFloat64(ctx, ImGui::GetColumnWidth(col));
+        break;
+      }
+      case IMGUI_SET_COLUMN_WIDTH: {
+        int32_t col;
+        double width;
+        JS_ToInt32(ctx, &col, argv[0]);
+        JS_ToFloat64(ctx, &width, argv[1]);
+        ImGui::SetColumnWidth(col, width);
+        break;
+      }
+      case IMGUI_GET_COLUMN_OFFSET: {
+        int32_t col = -1;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &col, argv[0]);
+        ret = JS_NewFloat64(ctx, ImGui::GetColumnOffset(col));
+        break;
+      }
+      case IMGUI_SET_COLUMN_OFFSET: {
+        int32_t col;
+        double offset_x;
+        JS_ToInt32(ctx, &col, argv[0]);
+        JS_ToFloat64(ctx, &offset_x, argv[1]);
+        ImGui::SetColumnOffset(col, offset_x);
+        break;
+      }
+      case IMGUI_GET_COLUMNS_COUNT: {
+        ret = JS_NewUint32(ctx, ImGui::GetColumnsCount());
+        break;
+      }
+      case IMGUI_BEGIN_TAB_BAR: {
+        const char* str_id = JS_ToCString(ctx, argv[0]);
+        int32_t flags = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &flags, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::BeginTabBar(str_id, flags));
+        JS_FreeCString(ctx, str_id);
+        break;
+      }
+      case IMGUI_END_TAB_BAR: {
+        ImGui::EndTabBar();
+        break;
+      }
+      case IMGUI_BEGIN_TAB_ITEM: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<bool> p_open(ctx, argc >= 2 ? argv[1] : JS_NULL);
+        int32_t flags = 0;
+        if(argc >= 3)
+          JS_ToInt32(ctx, &flags, argv[2]);
+        ret = JS_NewBool(ctx, ImGui::BeginTabItem(label, p_open, flags));
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_END_TAB_ITEM: {
+        ImGui::EndTabItem();
+        break;
+      }
+      case IMGUI_TAB_ITEM_BUTTON: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        int32_t flags = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &flags, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::TabItemButton(label, flags));
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_SET_TAB_ITEM_CLOSED: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        ImGui::SetTabItemClosed(label);
+        JS_FreeCString(ctx, label);
+        break;
+      }
+      case IMGUI_LOG_TO_TTY: {
+        int32_t auto_open_depth = -1;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &auto_open_depth, argv[0]);
+        ImGui::LogToTTY(auto_open_depth);
+        break;
+      }
+      case IMGUI_LOG_TO_FILE: {
+        int32_t auto_open_depth = -1;
+        const char* filename = 0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &auto_open_depth, argv[0]);
+        if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+          filename = JS_ToCString(ctx, argv[1]);
+        ImGui::LogToFile(auto_open_depth, filename);
+        if(filename)
+          JS_FreeCString(ctx, filename);
+        break;
+      }
+      case IMGUI_LOG_TO_CLIPBOARD: {
+        int32_t auto_open_depth = -1;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &auto_open_depth, argv[0]);
+        ImGui::LogToClipboard(auto_open_depth);
+        break;
+      }
+      case IMGUI_LOG_FINISH: {
+        ImGui::LogFinish();
+        break;
+      }
+      case IMGUI_LOG_BUTTONS: {
+        ImGui::LogButtons();
+        break;
+      }
+      case IMGUI_LOG_TEXT: {
+        int count = js_imgui_formatcount(ctx, argc, argv);
+        assert(count <= 32);
+        void* a[count];
+        js_imgui_formatargs(ctx, argc, argv, a);
+        ImGui::LogText((const char*)a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[25], a[26], a[27], a[28], a[29], a[30], a[31]);
+        break;
+      }
+      case IMGUI_BEGIN_DRAG_DROP_SOURCE: {
+        int32_t flags = 0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &flags, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::BeginDragDropSource(flags));
+        break;
+      }
+      case IMGUI_SET_DRAG_DROP_PAYLOAD: {
+        const char* type = JS_ToCString(ctx, argv[0]);
+        uint8_t* ptr;
+        size_t len;
+        int32_t cond = 0;
+        if(argc >= 3)
+          JS_ToInt32(ctx, &cond, argv[2]);
+        ptr = JS_GetArrayBuffer(ctx, &len, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::SetDragDropPayload(type, ptr, len, cond));
+        JS_FreeCString(ctx, type);
+        break;
+      }
+      case IMGUI_END_DRAG_DROP_SOURCE: {
+        ImGui::EndDragDropSource();
+        break;
+      }
+      case IMGUI_BEGIN_DRAG_DROP_TARGET: {
+        ret = JS_NewBool(ctx, ImGui::BeginDragDropTarget());
+        break;
+      }
+      case IMGUI_ACCEPT_DRAG_DROP_PAYLOAD: {
+        const char* type = JS_ToCString(ctx, argv[0]);
+        int32_t flags = 0;
+        if(argc >= 2)
+          JS_ToInt32(ctx, &flags, argv[1]);
+        ret = js_imgui_payload_wrap(ctx, new ImGuiPayload(*ImGui::AcceptDragDropPayload(type, flags)));
+        JS_FreeCString(ctx, type);
+        break;
+      }
+      case IMGUI_END_DRAG_DROP_TARGET: {
+        ImGui::EndDragDropTarget();
+        break;
+      }
+      case IMGUI_GET_DRAG_DROP_PAYLOAD: {
+        ret = js_imgui_payload_wrap(ctx, new ImGuiPayload(*ImGui::GetDragDropPayload()));
+        break;
+      }
+      case IMGUI_BEGIN_DISABLED: {
+        bool disabled = true;
+        if(argc >= 1)
+          disabled = JS_ToBool(ctx, argv[0]);
+        ImGui::BeginDisabled(disabled);
+        break;
+      }
+      case IMGUI_END_DISABLED: {
+        ImGui::EndDisabled();
+        break;
+      }
+      case IMGUI_PUSH_CLIP_RECT: {
+        ImVec2 clip_rect_min = js_imgui_getimvec2(ctx, argv[0]), clip_rect_max = js_imgui_getimvec2(ctx, argv[1]);
+        bool intersect_with_current_clip_rect = JS_ToBool(ctx, argv[2]);
+        ImGui::PushClipRect(clip_rect_min, clip_rect_max, intersect_with_current_clip_rect);
+        break;
+      }
+      case IMGUI_POP_CLIP_RECT: {
+        ImGui::PopClipRect();
+        break;
+      }
+      case IMGUI_SET_ITEM_DEFAULT_FOCUS: {
+        ImGui::SetItemDefaultFocus();
+        break;
+      }
+      case IMGUI_SET_KEYBOARD_FOCUS_HERE: {
+        int32_t offset = 0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &offset, argv[0]);
+        ImGui::SetKeyboardFocusHere(offset);
+        break;
+      }
+      case IMGUI_IS_ITEM_HOVERED: {
+        int32_t flags = 0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &flags, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsItemHovered(flags));
+        break;
+      }
+      case IMGUI_IS_ITEM_ACTIVE: {
+        ret = JS_NewBool(ctx, ImGui::IsItemActive());
+        break;
+      }
+      case IMGUI_IS_ITEM_FOCUSED: {
+        ret = JS_NewBool(ctx, ImGui::IsItemFocused());
+        break;
+      }
+      case IMGUI_IS_ITEM_CLICKED: {
+        int32_t mouse_button = 0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &mouse_button, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsItemClicked(mouse_button));
+        break;
+      }
+      case IMGUI_IS_ITEM_VISIBLE: {
+        ret = JS_NewBool(ctx, ImGui::IsItemVisible());
+        break;
+      }
+      case IMGUI_IS_ITEM_EDITED: {
+        ret = JS_NewBool(ctx, ImGui::IsItemEdited());
+        break;
+      }
+      case IMGUI_IS_ITEM_ACTIVATED: {
+        ret = JS_NewBool(ctx, ImGui::IsItemActivated());
+        break;
+      }
+      case IMGUI_IS_ITEM_DEACTIVATED: {
+        ret = JS_NewBool(ctx, ImGui::IsItemDeactivated());
+        break;
+      }
+      case IMGUI_IS_ITEM_DEACTIVATED_AFTER_EDIT: {
+        ret = JS_NewBool(ctx, ImGui::IsItemDeactivatedAfterEdit());
+        break;
+      }
+      case IMGUI_IS_ANY_ITEM_HOVERED: {
+        ret = JS_NewBool(ctx, ImGui::IsAnyItemHovered());
+        break;
+      }
+      case IMGUI_IS_ANY_ITEM_ACTIVE: {
+        ret = JS_NewBool(ctx, ImGui::IsAnyItemActive());
+        break;
+      }
+      case IMGUI_IS_ANY_ITEM_FOCUSED: {
+        ret = JS_NewBool(ctx, ImGui::IsAnyItemFocused());
+        break;
+      }
+      case IMGUI_GET_ITEM_RECT_MIN: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetItemRectMin());
+        break;
+      }
+      case IMGUI_GET_ITEM_RECT_MAX: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetItemRectMax());
+        break;
+      }
+      case IMGUI_GET_ITEM_RECT_SIZE: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetItemRectSize());
+        break;
+      }
+      case IMGUI_SET_ITEM_ALLOW_OVERLAP: {
+        ImGui::SetItemAllowOverlap();
+        break;
+      }
+      case IMGUI_IS_RECT_VISIBLE: {
+        if(argc >= 2) {
+          ImVec2 rect_min = js_imgui_getimvec2(ctx, argv[0]), rect_max = js_imgui_getimvec2(ctx, argv[1]);
+          ret = JS_NewBool(ctx, ImGui::IsRectVisible(rect_min, rect_max));
+        } else {
+          ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
+          ret = JS_NewBool(ctx, ImGui::IsRectVisible(size));
+        }
+        break;
+      }
+      case IMGUI_GET_TIME: {
+        ret = JS_NewFloat64(ctx, ImGui::GetTime());
+        break;
+      }
+      case IMGUI_GET_FRAME_COUNT: {
+        ret = JS_NewInt64(ctx, ImGui::GetFrameCount());
+        break;
+      }
+      case IMGUI_GET_BACKGROUND_DRAW_LIST: break;
+      case IMGUI_GET_FOREGROUND_DRAW_LIST: break;
+      case IMGUI_GET_DRAW_LIST_SHARED_DATA: break;
+      case IMGUI_GET_STYLE_COLOR_NAME: {
+        int32_t idx;
+        JS_ToInt32(ctx, &idx, argv[0]);
+        ret = JS_NewString(ctx, ImGui::GetStyleColorName(idx));
+        break;
+      }
+      case IMGUI_SET_STATE_STORAGE: break;
+      case IMGUI_GET_STATE_STORAGE: break;
+      case IMGUI_CALC_TEXT_SIZE: {
+        const char *text = JS_ToCString(ctx, argv[0]), *text_end = 0;
+        bool hide_text_after_double_hash = false;
+        double wrap_width = -1.0f;
+        if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+          text_end = JS_ToCString(ctx, argv[1]);
+        if(argc >= 3)
+          hide_text_after_double_hash = JS_ToBool(ctx, argv[2]);
+        if(argc >= 4)
+          JS_ToFloat64(ctx, &wrap_width, argv[3]);
+        ret = js_imgui_newimvec2(ctx, ImGui::CalcTextSize(text, text_end, hide_text_after_double_hash, wrap_width));
+        JS_FreeCString(ctx, text);
+        if(text_end)
+          JS_FreeCString(ctx, text_end);
+        break;
+      }
+      case IMGUI_CALC_LIST_CLIPPING: break;
+      case IMGUI_BEGIN_CHILD_FRAME: {
+        int32_t id, window_flags = 0;
+        ImVec2 size = js_imgui_getimvec2(ctx, argv[1]);
+        JS_ToInt32(ctx, &id, argv[0]);
+        if(argc >= 3)
+          JS_ToInt32(ctx, &window_flags, argv[2]);
+        ret = JS_NewBool(ctx, ImGui::BeginChildFrame(id, size, window_flags));
+        break;
+      }
+      case IMGUI_END_CHILD_FRAME: {
+        ImGui::EndChildFrame();
+        break;
+      }
+      case IMGUI_COLOR_CONVERTU32_TO_FLOAT4: {
+        uint32_t in;
+        JS_ToUint32(ctx, &in, argv[0]);
+        ret = js_imgui_newimvec4(ctx, ImGui::ColorConvertU32ToFloat4(in));
+        break;
+      }
+      case IMGUI_COLOR_CONVERT_FLOAT4_TOU32: {
+        ImVec4 in = js_imgui_getimvec4(ctx, argv[0]);
+        ret = JS_NewUint32(ctx, ImGui::ColorConvertFloat4ToU32(in));
+        break;
+      }
+      case IMGUI_COLOR_CONVERT_RGB_TO_HSV: {
+        double r, g, b;
+        float h, s, v;
+        JS_ToFloat64(ctx, &r, argv[0]);
+        JS_ToFloat64(ctx, &g, argv[1]);
+        JS_ToFloat64(ctx, &b, argv[2]);
+        ImGui::ColorConvertRGBtoHSV(r, g, b, h, s, v);
+        ret = JS_NewArray(ctx);
+        JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, h));
+        JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, s));
+        JS_SetPropertyUint32(ctx, ret, 2, JS_NewFloat64(ctx, v));
+        break;
+      }
+      case IMGUI_COLOR_CONVERT_HSV_TO_RGB: {
+        double h, s, v;
+        float r, g, b;
+        JS_ToFloat64(ctx, &h, argv[0]);
+        JS_ToFloat64(ctx, &s, argv[1]);
+        JS_ToFloat64(ctx, &v, argv[2]);
+        ImGui::ColorConvertHSVtoRGB(h, s, v, r, g, b);
+        ret = JS_NewArray(ctx);
+        JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, r));
+        JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, g));
+        JS_SetPropertyUint32(ctx, ret, 2, JS_NewFloat64(ctx, b));
+        break;
+      }
+      case IMGUI_GET_KEY_INDEX: {
+        int32_t imgui_key;
+        JS_ToInt32(ctx, &imgui_key, argv[0]);
+        ret = JS_NewInt32(ctx, ImGui::GetKeyIndex(imgui_key));
+        break;
+      }
+      case IMGUI_IS_KEY_DOWN: {
+        int32_t user_key_index;
+        JS_ToInt32(ctx, &user_key_index, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsKeyDown(user_key_index));
+        break;
+      }
+      case IMGUI_IS_KEY_PRESSED: {
+        int32_t user_key_index;
+        bool repeat = true;
+        if(argc >= 2)
+          repeat = JS_ToBool(ctx, argv[1]);
+        JS_ToInt32(ctx, &user_key_index, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsKeyPressed(user_key_index, repeat));
+        break;
+      }
+      case IMGUI_IS_KEY_RELEASED: {
+        int32_t user_key_index;
+        JS_ToInt32(ctx, &user_key_index, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsKeyReleased(user_key_index));
+        break;
+      }
+      case IMGUI_GET_KEY_PRESSED_AMOUNT: {
+        int32_t key_index;
+        double repeat_delay, rate;
+        JS_ToInt32(ctx, &key_index, argv[0]);
+        JS_ToFloat64(ctx, &repeat_delay, argv[1]);
+        JS_ToFloat64(ctx, &rate, argv[2]);
+        ret = JS_NewInt32(ctx, ImGui::GetKeyPressedAmount(key_index, repeat_delay, rate));
+        break;
+      }
+      case IMGUI_IS_MOUSE_DOWN: {
+        int32_t button;
+        JS_ToInt32(ctx, &button, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsMouseDown(button));
+        break;
+      }
+      case IMGUI_IS_ANY_MOUSE_DOWN: {
+        ret = JS_NewBool(ctx, ImGui::IsAnyMouseDown());
+        break;
+      }
+      case IMGUI_IS_MOUSE_CLICKED: {
+        int32_t button;
+        bool repeat = true;
+        if(argc >= 2)
+          repeat = JS_ToBool(ctx, argv[1]);
+        JS_ToInt32(ctx, &button, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsMouseClicked(button, repeat));
+        break;
+      }
+      case IMGUI_IS_MOUSE_DOUBLE_CLICKED: {
+        int32_t button;
+        JS_ToInt32(ctx, &button, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsMouseDoubleClicked(button));
+        break;
+      }
+      case IMGUI_IS_MOUSE_RELEASED: {
+        int32_t button;
+        JS_ToInt32(ctx, &button, argv[0]);
+        ret = JS_NewBool(ctx, ImGui::IsMouseReleased(button));
+        break;
+      }
+      case IMGUI_IS_MOUSE_DRAGGING: {
+        int32_t button;
+        double lock_threshold = -1.0;
+        JS_ToInt32(ctx, &button, argv[0]);
+        if(argc >= 2)
+          JS_ToFloat64(ctx, &lock_threshold, argv[1]);
+        ret = JS_NewBool(ctx, ImGui::IsMouseDragging(button, lock_threshold));
+        break;
+      }
+      case IMGUI_IS_MOUSE_HOVERING_RECT: {
+        ImVec2 r_min = js_imgui_getimvec2(ctx, argv[0]), r_max = js_imgui_getimvec2(ctx, argv[1]);
+        bool clip = true;
+        if(argc >= 3)
+          clip = JS_ToBool(ctx, argv[2]);
+        ret = JS_NewBool(ctx, ImGui::IsMouseHoveringRect(r_min, r_max, clip));
+        break;
+      }
+      case IMGUI_IS_MOUSE_POS_VALID: {
+        const ImVec2* ptr = 0;
+        ImVec2 pos;
+        if(argc >= 1) {
+          pos = js_imgui_getimvec2(ctx, argv[0]);
+          ptr = &pos;
+        }
+        ret = JS_NewBool(ctx, ImGui::IsMousePosValid(ptr));
+        break;
+      }
+      case IMGUI_GET_MOUSE_POS: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetMousePos());
+        break;
+      }
+      case IMGUI_GET_MOUSE_POS_ON_OPENING_CURRENT_POPUP: {
+        ret = js_imgui_newimvec2(ctx, ImGui::GetMousePosOnOpeningCurrentPopup());
+        break;
+      }
+      case IMGUI_GET_MOUSE_DRAG_DELTA: {
+        int32_t mouse_button = 0;
+        double lock_threshold = -1.0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &mouse_button, argv[0]);
+        if(argc >= 2)
+          JS_ToFloat64(ctx, &lock_threshold, argv[1]);
+        ret = js_imgui_newimvec2(ctx, ImGui::GetMouseDragDelta(mouse_button, lock_threshold));
+        break;
+      }
+      case IMGUI_RESET_MOUSE_DRAG_DELTA: {
+        int32_t mouse_button = 0;
+        if(argc >= 1)
+          JS_ToInt32(ctx, &mouse_button, argv[0]);
+        ImGui::ResetMouseDragDelta(mouse_button);
+        break;
+      }
+      case IMGUI_GET_MOUSE_CURSOR: {
+        ret = JS_NewInt32(ctx, ImGui::GetMouseCursor());
+        break;
+      }
+      case IMGUI_SET_MOUSE_CURSOR: {
+        int32_t mouse_cursor;
+        JS_ToInt32(ctx, &mouse_cursor, argv[0]);
+        ImGui::SetMouseCursor(mouse_cursor);
+        break;
+      }
+      case IMGUI_CAPTURE_KEYBOARD_FROM_APP: {
+        bool want_capture = true;
+        if(argc >= 1)
+          want_capture = JS_ToBool(ctx, argv[0]);
+        ImGui::CaptureKeyboardFromApp(want_capture);
+        break;
+      }
+      case IMGUI_CAPTURE_MOUSE_FROM_APP: {
+        bool want_capture = true;
+        if(argc >= 1)
+          want_capture = JS_ToBool(ctx, argv[0]);
+        ImGui::CaptureMouseFromApp(want_capture);
+        break;
+      }
+      case IMGUI_GET_CLIPBOARD_TEXT: {
+        ret = JS_NewString(ctx, ImGui::GetClipboardText());
+        break;
+      }
+      case IMGUI_SET_CLIPBOARD_TEXT: {
+        const char* text = JS_ToCString(ctx, argv[0]);
+        ImGui::SetClipboardText(text);
+        JS_FreeCString(ctx, text);
+
+        break;
+      }
+      case IMGUI_LOAD_INI_SETTINGS_FROM_DISK: {
+        const char* file = JS_ToCString(ctx, argv[0]);
+        ImGui::LoadIniSettingsFromDisk(file);
+        JS_FreeCString(ctx, file);
+        break;
+      }
+      case IMGUI_LOAD_INI_SETTINGS_FROM_MEMORY: {
+        uint8_t* ptr;
+        size_t len;
+        if(JS_IsString(argv[0])) {
+          const char* data = JS_ToCStringLen(ctx, &len, argv[0]);
+          ImGui::LoadIniSettingsFromMemory(data, len);
+          JS_FreeCString(ctx, data);
+        } else if((ptr = JS_GetArrayBuffer(ctx, &len, argv[0]))) {
+          ImGui::LoadIniSettingsFromMemory(reinterpret_cast<const char*>(ptr), len);
+        } else {
+          ret = JS_ThrowInternalError(ctx, "argument 1 is neither String nor ArrayBuffer");
+        }
+        break;
+      }
+      case IMGUI_SAVE_INI_SETTINGS_TO_DISK: {
+        const char* file = JS_ToCString(ctx, argv[0]);
+        ImGui::SaveIniSettingsToDisk(file);
+        JS_FreeCString(ctx, file);
+        break;
+      }
+      case IMGUI_SAVE_INI_SETTINGS_TO_MEMORY: {
+        size_t len;
+        const char* data = ImGui::SaveIniSettingsToMemory(&len);
+
+        ret = JS_NewArrayBufferCopy(ctx, reinterpret_cast<const uint8_t*>(data), len);
+        break;
+      }
+      case IMGUI_SET_ALLOCATOR_FUNCTIONS: break;
+      case IMGUI_MEM_ALLOC: {
+        uint64_t len;
+        void* data;
+        JS_ToIndex(ctx, &len, argv[0]);
+        data = ImGui::MemAlloc(len);
+        ret = JS_NewArrayBuffer(ctx, static_cast<uint8_t*>(data), len, js_imgui_free_func, (void*)len, FALSE);
+        break;
+      }
+      case IMGUI_MEM_FREE: {
+        JS_DetachArrayBuffer(ctx, argv[0]);
+        break;
+      }
     }
-    case IMGUI_SET_ALLOCATOR_FUNCTIONS: break;
-    case IMGUI_MEM_ALLOC: {
-      uint64_t len;
-      void* data;
-      JS_ToIndex(ctx, &len, argv[0]);
-      data = ImGui::MemAlloc(len);
-      ret = JS_NewArrayBuffer(ctx, static_cast<uint8_t*>(data), len, js_imgui_free_func, (void*)len, FALSE);
-      break;
-    }
-    case IMGUI_MEM_FREE: {
-      JS_DetachArrayBuffer(ctx, argv[0]);
-      break;
-    }
-  }
+  } catch(const ImGui::Exception& exception) { return exception.throw_js(ctx); }
 
   return ret;
 }
 static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_CFUNC_MAGIC_DEF("Init", 1, js_imgui_functions, IMGUI_INIT),
     JS_CFUNC_MAGIC_DEF("CreateContext", 0, js_imgui_functions, IMGUI_CREATE_CONTEXT),
-    JS_CFUNC_MAGIC_DEF("DestroyContext", 1, js_imgui_functions, IMGUI_DESTROY_CONTEXT),
+    JS_CFUNC_MAGIC_DEF("DestroyContext", 0, js_imgui_functions, IMGUI_DESTROY_CONTEXT),
     JS_CFUNC_MAGIC_DEF("GetCurrentContext", 0, js_imgui_functions, IMGUI_GET_CURRENT_CONTEXT),
     JS_CFUNC_MAGIC_DEF("SetCurrentContext", 1, js_imgui_functions, IMGUI_SET_CURRENT_CONTEXT),
     JS_CFUNC_MAGIC_DEF("GetIO", 0, js_imgui_functions, IMGUI_GET_IO),
@@ -2696,7 +2756,7 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_CFUNC_MAGIC_DEF("EndFrame", 0, js_imgui_functions, IMGUI_END_FRAME),
     JS_CFUNC_MAGIC_DEF("Render", 0, js_imgui_functions, IMGUI_RENDER),
     JS_CFUNC_MAGIC_DEF("GetDrawData", 0, js_imgui_functions, IMGUI_GET_DRAW_DATA),
-    JS_CFUNC_MAGIC_DEF("RenderDrawData", 0, js_imgui_functions, IMGUI_RENDER_DRAW_DATA),
+    /*JS_CFUNC_MAGIC_DEF("RenderDrawData", 0, js_imgui_functions, IMGUI_RENDER_DRAW_DATA),*/
     JS_CFUNC_MAGIC_DEF("ShowDemoWindow", 1, js_imgui_functions, IMGUI_SHOW_DEMO_WINDOW),
     JS_CFUNC_MAGIC_DEF("ShowAboutWindow", 1, js_imgui_functions, IMGUI_SHOW_ABOUT_WINDOW),
     JS_CFUNC_MAGIC_DEF("ShowMetricsWindow", 1, js_imgui_functions, IMGUI_SHOW_METRICS_WINDOW),
@@ -3061,80 +3121,82 @@ js_imgui_impl_glfw_functions(JSContext* ctx, JSValueConst this_val, int argc, JS
     }
   }
 
-  switch(magic) {
-    case IMPL_GLFW_INIT_FOR_OPEN_GL: {
-      ImGui_ImplGlfw_InitForOpenGL(window, JS_ToBool(ctx, argv[1]));
-      break;
-    }
-    case IMPL_GLFW_INIT_FOR_VULKAN: {
-      ImGui_ImplGlfw_InitForVulkan(window, JS_ToBool(ctx, argv[1]));
-      break;
-    }
-    case IMPL_GLFW_INIT_FOR_OTHER: {
-      ImGui_ImplGlfw_InitForOther(window, JS_ToBool(ctx, argv[1]));
-      break;
-    }
-    case IMPL_GLFW_SHUTDOWN: {
-      ImGui_ImplGlfw_Shutdown();
-      break;
-    }
-    case IMPL_GLFW_NEW_FRAME: {
-      ImGui_ImplGlfw_NewFrame();
-      break;
-    }
-    case IMPL_GLFW_WINDOW_FOCUS_CALLBACK: {
-      int32_t focused;
-      JS_ToInt32(ctx, &focused, argv[1]);
-      ImGui_ImplGlfw_WindowFocusCallback(window, focused);
-      break;
-    }
-    case IMPL_GLFW_CURSOR_ENTER_CALLBACK: {
-      int32_t entered;
-      JS_ToInt32(ctx, &entered, argv[1]);
-      ImGui_ImplGlfw_CursorEnterCallback(window, entered);
-      break;
-    }
-    case IMPL_GLFW_MOUSE_BUTTON_CALLBACK: {
-      int32_t button, action, mods;
+  try {
+    switch(magic) {
+      case IMPL_GLFW_INIT_FOR_OPEN_GL: {
+        ImGui_ImplGlfw_InitForOpenGL(window, JS_ToBool(ctx, argv[1]));
+        break;
+      }
+      case IMPL_GLFW_INIT_FOR_VULKAN: {
+        ImGui_ImplGlfw_InitForVulkan(window, JS_ToBool(ctx, argv[1]));
+        break;
+      }
+      case IMPL_GLFW_INIT_FOR_OTHER: {
+        ImGui_ImplGlfw_InitForOther(window, JS_ToBool(ctx, argv[1]));
+        break;
+      }
+      case IMPL_GLFW_SHUTDOWN: {
+        ImGui_ImplGlfw_Shutdown();
+        break;
+      }
+      case IMPL_GLFW_NEW_FRAME: {
+        ImGui_ImplGlfw_NewFrame();
+        break;
+      }
+      case IMPL_GLFW_WINDOW_FOCUS_CALLBACK: {
+        int32_t focused;
+        JS_ToInt32(ctx, &focused, argv[1]);
+        ImGui_ImplGlfw_WindowFocusCallback(window, focused);
+        break;
+      }
+      case IMPL_GLFW_CURSOR_ENTER_CALLBACK: {
+        int32_t entered;
+        JS_ToInt32(ctx, &entered, argv[1]);
+        ImGui_ImplGlfw_CursorEnterCallback(window, entered);
+        break;
+      }
+      case IMPL_GLFW_MOUSE_BUTTON_CALLBACK: {
+        int32_t button, action, mods;
 
-      JS_ToInt32(ctx, &button, argv[1]);
-      JS_ToInt32(ctx, &action, argv[2]);
-      JS_ToInt32(ctx, &mods, argv[3]);
+        JS_ToInt32(ctx, &button, argv[1]);
+        JS_ToInt32(ctx, &action, argv[2]);
+        JS_ToInt32(ctx, &mods, argv[3]);
 
-      ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
-      break;
-    }
-    case IMPL_GLFW_SCROLL_CALLBACK: {
-      double x, y;
-      JS_ToFloat64(ctx, &x, argv[1]);
-      JS_ToFloat64(ctx, &y, argv[2]);
-      ImGui_ImplGlfw_ScrollCallback(window, x, y);
-      break;
-    }
-    case IMPL_GLFW_KEY_CALLBACK: {
-      int32_t key, scancode, action, mods;
+        ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+        break;
+      }
+      case IMPL_GLFW_SCROLL_CALLBACK: {
+        double x, y;
+        JS_ToFloat64(ctx, &x, argv[1]);
+        JS_ToFloat64(ctx, &y, argv[2]);
+        ImGui_ImplGlfw_ScrollCallback(window, x, y);
+        break;
+      }
+      case IMPL_GLFW_KEY_CALLBACK: {
+        int32_t key, scancode, action, mods;
 
-      JS_ToInt32(ctx, &key, argv[1]);
-      JS_ToInt32(ctx, &scancode, argv[2]);
-      JS_ToInt32(ctx, &action, argv[3]);
-      JS_ToInt32(ctx, &mods, argv[4]);
-      ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
-      break;
-    }
-    case IMPL_GLFW_CHAR_CALLBACK: {
-      uint32_t c;
+        JS_ToInt32(ctx, &key, argv[1]);
+        JS_ToInt32(ctx, &scancode, argv[2]);
+        JS_ToInt32(ctx, &action, argv[3]);
+        JS_ToInt32(ctx, &mods, argv[4]);
+        ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+        break;
+      }
+      case IMPL_GLFW_CHAR_CALLBACK: {
+        uint32_t c;
 
-      JS_ToUint32(ctx, &c, argv[1]);
-      ImGui_ImplGlfw_CharCallback(window, c);
-      break;
+        JS_ToUint32(ctx, &c, argv[1]);
+        ImGui_ImplGlfw_CharCallback(window, c);
+        break;
+      }
+      case IMPL_GLFW_MONITOR_CALLBACK: {
+        int32_t event;
+        JS_ToInt32(ctx, &event, argv[1]);
+        ImGui_ImplGlfw_MonitorCallback(monitor, event);
+        break;
+      }
     }
-    case IMPL_GLFW_MONITOR_CALLBACK: {
-      int32_t event;
-      JS_ToInt32(ctx, &event, argv[1]);
-      ImGui_ImplGlfw_MonitorCallback(monitor, event);
-      break;
-    }
-  }
+  } catch(const ImGui::Exception& exception) { return exception.throw_js(ctx); }
 
   return ret;
 }
@@ -3152,6 +3214,7 @@ static const JSCFunctionListEntry js_imgui_impl_glfw[] = {
     JS_CFUNC_MAGIC_DEF("KeyCallback", 5, js_imgui_impl_glfw_functions, IMPL_GLFW_KEY_CALLBACK),
     JS_CFUNC_MAGIC_DEF("CharCallback", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_CHAR_CALLBACK),
     JS_CFUNC_MAGIC_DEF("MonitorCallback", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_MONITOR_CALLBACK),
+    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui::ImplGlfw", JS_PROP_CONFIGURABLE),
 };
 
 enum {
@@ -3169,16 +3232,18 @@ static JSValue
 js_imgui_impl_opengl2_call(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
   JSValue ret = JS_UNDEFINED;
 
-  switch(magic) {
-    case IMPL_OPENGL_INIT: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_Init()); break;
-    case IMPL_OPENGL_SHUTDOWN: ImGui_ImplOpenGL2_Shutdown(); break;
-    case IMPL_OPENGL_NEW_FRAME: ImGui_ImplOpenGL2_NewFrame(); break;
-    case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData()); break;
-    case IMPL_OPENGL_CREATE_FONTS_TEXTURE: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_CreateFontsTexture()); break;
-    case IMPL_OPENGL_DESTROY_FONTS_TEXTURE: ImGui_ImplOpenGL2_DestroyFontsTexture(); break;
-    case IMPL_OPENGL_CREATE_DEVICE_OBJECTS: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_CreateDeviceObjects()); break;
-    case IMPL_OPENGL_DESTROY_DEVICE_OBJECTS: ImGui_ImplOpenGL2_DestroyDeviceObjects(); break;
-  }
+  try {
+    switch(magic) {
+      case IMPL_OPENGL_INIT: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_Init()); break;
+      case IMPL_OPENGL_SHUTDOWN: ImGui_ImplOpenGL2_Shutdown(); break;
+      case IMPL_OPENGL_NEW_FRAME: ImGui_ImplOpenGL2_NewFrame(); break;
+      case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData()); break;
+      case IMPL_OPENGL_CREATE_FONTS_TEXTURE: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_CreateFontsTexture()); break;
+      case IMPL_OPENGL_DESTROY_FONTS_TEXTURE: ImGui_ImplOpenGL2_DestroyFontsTexture(); break;
+      case IMPL_OPENGL_CREATE_DEVICE_OBJECTS: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_CreateDeviceObjects()); break;
+      case IMPL_OPENGL_DESTROY_DEVICE_OBJECTS: ImGui_ImplOpenGL2_DestroyDeviceObjects(); break;
+    }
+  } catch(const ImGui::Exception& exception) { return exception.throw_js(ctx); }
 
   return ret;
 }
@@ -3192,31 +3257,34 @@ static const JSCFunctionListEntry js_imgui_impl_opengl2[] = {
     JS_CFUNC_MAGIC_DEF("DestroyFontsTexture", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_DESTROY_FONTS_TEXTURE),
     JS_CFUNC_MAGIC_DEF("CreateDeviceObjects", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_CREATE_DEVICE_OBJECTS),
     JS_CFUNC_MAGIC_DEF("DestroyDeviceObjects", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_DESTROY_DEVICE_OBJECTS),
+    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui::ImplOpenGL2", JS_PROP_CONFIGURABLE),
 };
 
 static JSValue
 js_imgui_impl_opengl3_call(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
   JSValue ret = JS_UNDEFINED;
 
-  switch(magic) {
-    case IMPL_OPENGL_INIT: {
-      const char* glsl_version = 0;
-      if(argc > 0)
-        glsl_version = JS_ToCString(ctx, argv[0]);
+  try {
+    switch(magic) {
+      case IMPL_OPENGL_INIT: {
+        const char* glsl_version = 0;
+        if(argc > 0)
+          glsl_version = JS_ToCString(ctx, argv[0]);
 
-      ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_Init(glsl_version));
-      if(glsl_version)
-        JS_FreeCString(ctx, glsl_version);
-      break;
+        ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_Init(glsl_version));
+        if(glsl_version)
+          JS_FreeCString(ctx, glsl_version);
+        break;
+      }
+      case IMPL_OPENGL_SHUTDOWN: ImGui_ImplOpenGL3_Shutdown(); break;
+      case IMPL_OPENGL_NEW_FRAME: ImGui_ImplOpenGL3_NewFrame(); break;
+      case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); break;
+      case IMPL_OPENGL_CREATE_FONTS_TEXTURE: ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_CreateFontsTexture()); break;
+      case IMPL_OPENGL_DESTROY_FONTS_TEXTURE: ImGui_ImplOpenGL3_DestroyFontsTexture(); break;
+      case IMPL_OPENGL_CREATE_DEVICE_OBJECTS: ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_CreateDeviceObjects()); break;
+      case IMPL_OPENGL_DESTROY_DEVICE_OBJECTS: ImGui_ImplOpenGL3_DestroyDeviceObjects(); break;
     }
-    case IMPL_OPENGL_SHUTDOWN: ImGui_ImplOpenGL3_Shutdown(); break;
-    case IMPL_OPENGL_NEW_FRAME: ImGui_ImplOpenGL3_NewFrame(); break;
-    case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); break;
-    case IMPL_OPENGL_CREATE_FONTS_TEXTURE: ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_CreateFontsTexture()); break;
-    case IMPL_OPENGL_DESTROY_FONTS_TEXTURE: ImGui_ImplOpenGL3_DestroyFontsTexture(); break;
-    case IMPL_OPENGL_CREATE_DEVICE_OBJECTS: ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_CreateDeviceObjects()); break;
-    case IMPL_OPENGL_DESTROY_DEVICE_OBJECTS: ImGui_ImplOpenGL3_DestroyDeviceObjects(); break;
-  }
+  } catch(const ImGui::Exception& exception) { return exception.throw_js(ctx); }
 
   return ret;
 }
@@ -3230,15 +3298,25 @@ static const JSCFunctionListEntry js_imgui_impl_opengl3[] = {
     JS_CFUNC_MAGIC_DEF("DestroyFontsTexture", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_DESTROY_FONTS_TEXTURE),
     JS_CFUNC_MAGIC_DEF("CreateDeviceObjects", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_CREATE_DEVICE_OBJECTS),
     JS_CFUNC_MAGIC_DEF("DestroyDeviceObjects", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_DESTROY_DEVICE_OBJECTS),
+    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui::ImplOpenGL3", JS_PROP_CONFIGURABLE),
 };
 
-static const JSCFunctionListEntry js_imgui_static_impls[] = {
+/*static const JSCFunctionListEntry js_imgui_static_impls[] = {
     JS_OBJECT_DEF("ImplGlfw", js_imgui_impl_glfw, countof(js_imgui_impl_glfw), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("ImplOpenGL2", js_imgui_impl_opengl2, countof(js_imgui_impl_opengl2), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("ImplOpenGL3", js_imgui_impl_opengl3, countof(js_imgui_impl_opengl3), JS_PROP_ENUMERABLE),
-};
+};*/
 
 #include "quickjs-imgui-inputtextcallbackdata.hpp"
+
+template<size_t N>
+static inline JSValue
+js_imgui_impl_object(JSContext* ctx, const JSCFunctionListEntry functions[N]) {
+  JSValue ret = JS_NewObjectProtoClass(ctx, JS_UNDEFINED, js_imgui_impl_class_id);
+
+  JS_SetPropertyFunctionList(ctx, ret, functions, N);
+  return ret;
+}
 
 extern "C" {
 
@@ -3307,6 +3385,9 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   JS_SetPropertyFunctionList(ctx, imgui_pointer_proto, js_imgui_pointer_funcs, countof(js_imgui_pointer_funcs));
   JS_SetClassProto(ctx, js_imgui_pointer_class_id, imgui_pointer_proto);
 
+  JS_NewClassID(&js_imgui_impl_class_id);
+  JS_NewClass(JS_GetRuntime(ctx), js_imgui_impl_class_id, &js_imgui_impl_class);
+
   if(m) {
     JS_SetModuleExport(ctx, m, "ImGuiIO", imgui_io_ctor);
     JS_SetModuleExport(ctx, m, "ImGuiStyle", imgui_style_ctor);
@@ -3314,8 +3395,11 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
     JS_SetModuleExport(ctx, m, "ImGuiPayload", imgui_payload_ctor);
     JS_SetModuleExport(ctx, m, "ImFont", imfont_ctor);
     JS_SetModuleExport(ctx, m, "ImFontAtlas", imfontatlas_ctor);
+    JS_SetModuleExport(ctx, m, "ImplGlfw", js_imgui_impl_object<countof(js_imgui_impl_glfw)>(ctx, js_imgui_impl_glfw));
+    JS_SetModuleExport(ctx, m, "ImplOpenGL2", js_imgui_impl_object<countof(js_imgui_impl_opengl2)>(ctx, js_imgui_impl_opengl2));
+    JS_SetModuleExport(ctx, m, "ImplOpenGL3", js_imgui_impl_object<countof(js_imgui_impl_opengl3)>(ctx, js_imgui_impl_opengl3));
     JS_SetModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
-    JS_SetModuleExportList(ctx, m, js_imgui_static_impls, countof(js_imgui_static_impls));
+    //  JS_SetModuleExportList(ctx, m, js_imgui_static_impls, countof(js_imgui_static_impls));
   }
 
   return 0;
@@ -3338,8 +3422,11 @@ js_init_module(JSContext* ctx, const char* module_name) {
   JS_AddModuleExport(ctx, m, "ImGuiPayload");
   JS_AddModuleExport(ctx, m, "ImFont");
   JS_AddModuleExport(ctx, m, "ImFontAtlas");
+  JS_AddModuleExport(ctx, m, "ImplGlfw");
+  JS_AddModuleExport(ctx, m, "ImplOpenGL2");
+  JS_AddModuleExport(ctx, m, "ImplOpenGL3");
   JS_AddModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
-  JS_AddModuleExportList(ctx, m, js_imgui_static_impls, countof(js_imgui_static_impls));
+  // JS_AddModuleExportList(ctx, m, js_imgui_static_impls, countof(js_imgui_static_impls));
   return m;
 }
 }

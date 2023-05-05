@@ -476,9 +476,11 @@ static const JSCFunctionListEntry js_imgui_coloredit_flags[] = {
     JS_PROP_INT32_DEF("DataTypeMask_", ImGuiColorEditFlags_DataTypeMask_, 0),
     JS_PROP_INT32_DEF("PickerMask_", ImGuiColorEditFlags_PickerMask_, 0),
     JS_PROP_INT32_DEF("InputMask_", ImGuiColorEditFlags_InputMask_, 0),
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
     JS_PROP_INT32_DEF("RGB", ImGuiColorEditFlags_RGB, 0),
     JS_PROP_INT32_DEF("HSV", ImGuiColorEditFlags_HSV, 0),
     JS_PROP_INT32_DEF("HEX", ImGuiColorEditFlags_HEX, 0),
+#endif
 };
 
 static const JSCFunctionListEntry js_imgui_slider_flags[] = {
@@ -488,7 +490,9 @@ static const JSCFunctionListEntry js_imgui_slider_flags[] = {
     JS_PROP_INT32_DEF("NoRoundToFormat", ImGuiSliderFlags_NoRoundToFormat, 0),
     JS_PROP_INT32_DEF("NoInput", ImGuiSliderFlags_NoInput, 0),
     JS_PROP_INT32_DEF("InvalidMask_", ImGuiSliderFlags_InvalidMask_, 0),
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
     JS_PROP_INT32_DEF("ClampOnInput", ImGuiSliderFlags_ClampOnInput, 0),
+#endif
 };
 
 static const JSCFunctionListEntry js_imgui_mousebutton[] = {

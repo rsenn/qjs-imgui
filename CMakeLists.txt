@@ -106,6 +106,10 @@ if(IMGUI_DEMO)
 endif(IMGUI_DEMO)
 
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+add_definitions(-DIMGUI_USER_CONFIG=\"quickjs-imconfig.hpp\")
+
+
 make_module(
   imgui
   quickjs-imgui.cpp
