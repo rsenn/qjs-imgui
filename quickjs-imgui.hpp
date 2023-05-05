@@ -463,6 +463,7 @@ js_to_scalar(JSContext* ctx, union ImGuiDataTypeUnion* data, JSValueConst value,
       return JS_ToFloat64(ctx, &data->f64, value);
     }
   }
+  return -1;
 }
 
 JSValue
@@ -479,6 +480,7 @@ js_from_scalar(JSContext* ctx, union ImGuiDataTypeUnion const* data, ImGuiDataTy
     case ImGuiDataType_Float: return JS_NewFloat64(ctx, data->f32);
     case ImGuiDataType_Double: return JS_NewFloat64(ctx, data->f64);
   }
+  return JS_ThrowTypeError(ctx, "No such ImGuiDataType (%d)", type);
 }
 
 template<> class OutputArg<union ImGuiDataTypeUnion> {

@@ -2,7 +2,9 @@ project(qjs-imgui C CXX)
 
 message("Building project [1;31m${PROJECT_NAME}[0m")
 
-option(USE_GL3W OFF "Use GL3W instead of GLEW")
+option(BUILD_GLFW OFF "Build GLFW from sources")
+option(USE_GL3W OFF "Use GL3W instead of internal loader")
+option(USE_GLEW OFF "Use GLEW instead of internal loader")
 
 cmake_minimum_required(VERSION 3.2)
 
@@ -11,20 +13,53 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/functions.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/check-flags.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindQuickJS.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/QuickJSModule.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLEW.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLFW.cmake)
+
 if(USE_GL3W)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildGL3W.cmake)
 endif(USE_GL3W)
 
-find_glew()
-find_glfw()
+if(USE_GLEW)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLEW.cmake)
+  find_glew()
+
+  add_definitions(-DUSE_GLEW)
+  include_directories(${GLEW_INCLUDE_DIR})
+  link_directories(${GLEW_LIBRARY_DIR})
+  link_libraries(${GLEW_LIBRARY})
+endif(USE_GLEW)
+
+if(BUILD_GLFW)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildGLFW.cmake)
+
+  build_glfw(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+
+  add_definitions(
+    -DHAVE_GLFW_GET_ERROR
+    -DHAVE_GLFW_GET_MONITOR_CONTENT_SCALE
+    -DHAVE_GLFW_GET_MONITOR_WORKAREA
+    -DHAVE_GLFW_GET_WINDOW_OPACITY
+    -DHAVE_GLFW_REQUEST_WINDOW_ATTENTION
+    -DHAVE_GLFW_SET_WINDOW_CONTENT_SCALE_CALLBACK
+    -DHAVE_GLFW_SET_WINDOW_MAXIMIZE_CALLBACK
+    -DHAVE_GLFW_SET_WINDOW_OPACITY
+    -DHAVE_GLFW_WINDOW_HINT_STRING)
+else(BUILD_GLFW)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLFW.cmake)
+  find_glfw()
+endif(BUILD_GLFW)
 
 if(USE_GL3W)
   build_gl3w()
 
+  include_directories(${CMAKE_CURRENT_BINARY_DIR}/gl3w/include)
+
   add_definitions(-DUSE_GL3W)
 endif(USE_GL3W)
+
+
+if(NOT USE_GLEW AND NOT USE_GL3W)
+  add_definitions(-DIMGUI_IMPL_OPENGL_ES2)
+endif(NOT USE_GLEW AND NOT USE_GL3W)
 
 #message(STATUS "GLEW_LIBRARY: ${GLEW_LIBRARY}")
 #message(STATUS "GLFW_LIBRARY: ${GLFW_LIBRARY}")
@@ -40,7 +75,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/imgui ${CMAKE_CURRENT_BINARY_DIR}/gl3w/include
-  ${QUICKJS_INCLUDE_DIR})
+  ${GLFW_INCLUDE_DIR} ${QUICKJS_INCLUDE_DIR})
 
 link_directories(${QUICKJS_LIBRARY_DIR})
 
@@ -50,13 +85,15 @@ if(USE_GL3W)
   endif(NOT TARGET gl3w_gen)
 endif(USE_GL3W)
 
-set(imgui_LIBRARIES ${GLFW_LIBRARY} ${GLEW_LIBRARY} ${OPENGL_gl_LIBRARY})
+set(imgui_LIBRARIES ${GLFW_LIBRARY}  ${OPENGL_gl_LIBRARY})
 #set(imgui_DEPS gl3w)
 
-set(IMGUI_SOURCES
-    imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp
-    imgui/imgui_widgets.cpp imgui/imgui_demo.cpp
-    imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
+set(IMGUI_SOURCES imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp
+                  imgui/imgui_widgets.cpp imgui/imgui_demo.cpp)
+
+if(USE_GL3W)
+  list(APPEND IMGUI_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/gl3w/src/gl3w.c)
+endif(USE_GL3W)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends)
 
@@ -68,4 +105,18 @@ if(IMGUI_DEMO)
   target_link_libraries(imgui_demo ${imgui_LIBRARIES} ${imgui_DEPS} dl)
 endif(IMGUI_DEMO)
 
-make_module(imgui quickjs-imgui.cpp quickjs-imgui.hpp ${IMGUI_SOURCES})
+
+make_module(
+  imgui
+  quickjs-imgui.cpp
+  quickjs-imgui-impl.cpp
+  quickjs-imfontatlas.hpp
+  quickjs-imfont.hpp
+  quickjs-imgui-constants.hpp
+  quickjs-imgui.hpp
+  quickjs-imgui-inputtextcallbackdata.hpp
+  quickjs-imgui-io.hpp
+  quickjs-imgui-payload.hpp
+  quickjs-imgui-pointer.hpp
+  quickjs-imgui-style.hpp
+  ${IMGUI_SOURCES})

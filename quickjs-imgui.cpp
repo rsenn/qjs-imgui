@@ -2,6 +2,11 @@
 #define _GNU_SOURCE
 #endif
 
+#ifdef USE_GL3W
+#include <GL/glcorearb.h>
+#include <GL/gl3w.h>
+#endif
+
 #include <imgui.h>
 #include <cassert>
 #include <cctype>
@@ -16,10 +21,12 @@
 #include "quickjs-imfontatlas.hpp"
 #include "quickjs-imgui-inputtextcallbackdata.hpp"
 
+#include "imgui/backends/imgui_impl_opengl2.h"
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui/backends/imgui_impl_glfw.h"
 
 static bool imgui_is_initialized;
+static const char* glsl_version = 0;
 
 static void
 js_imgui_init_gl(GLFWwindow* window) {
@@ -27,23 +34,22 @@ js_imgui_init_gl(GLFWwindow* window) {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
 
-    // Decide GL+GLSL versions
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-    // GL ES 2.0 + GLSL 100
-    const char* glsl_version = "#version 100"
-#elif defined(__APPLE__)
-    // GL 3.2 + GLSL 150
-    const char* glsl_version = "#version 150";
-#else
-    // GL 3.0 + GLSL 130
-    const char* glsl_version = "#version 130";
-#endif
+    IMGUI_CHECKVERSION();
 
-        IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
+
+#ifdef USE_GL3W
+    gl3wInit();
+#endif
+
+#ifdef USE_GLEW
+    glewInit();
+#endif
+
+    // ImGui_ImplOpenGL2_Init();
     ImGui_ImplOpenGL3_Init(glsl_version);
   }
 
@@ -130,6 +136,22 @@ js_imgui_getptr(JSContext* ctx, JSValueConst value) {
   sscanf(str, "%p", &ptr);
   JS_FreeCString(ctx, str);
   return static_cast<T*>(ptr);
+}
+
+template<typename T>
+static T*
+js_imgui_getobj(JSContext* ctx, JSValueConst value) {
+  T* obj = 0;
+
+  if(JS_IsString(value)) {
+    obj = js_imgui_getptr<T>(ctx, value);
+  } else if(JS_IsObject(value)) {
+    JSValue id = JS_GetPropertyStr(ctx, value, "id");
+
+    obj = js_imgui_getobj<T>(ctx, id);
+    JS_FreeValue(ctx, id);
+  }
+  return obj;
 }
 
 static ImTextureID
@@ -586,17 +608,16 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
   switch(magic) {
     case IMGUI_INIT: {
       GLFWwindow* window = 0;
-      if(argc >= 1 && JS_IsObject(argv[0])) {
-        JSValue id = JS_GetPropertyStr(ctx, argv[0], "id");
-
-        if(JS_IsString(id)) {
-          window = js_imgui_getptr<GLFWwindow>(ctx, id);
-        } else {
+      if(argc > 0) {
+        if(JS_IsArray(ctx, argv[0])) {
           ImVec2 size = js_imgui_getimvec2(ctx, argv[0]);
 
           window = glfwCreateWindow(size.x, size.y, "ImGui", NULL, NULL);
+        } else {
+          window = js_imgui_getobj<GLFWwindow>(ctx, argv[0]);
         }
       }
+
       if(window)
         js_imgui_init_gl(window);
       else
@@ -612,6 +633,9 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
     }
     case IMGUI_DESTROY_CONTEXT: {
       ImGuiContext* context = js_imgui_getptr<ImGuiContext>(ctx, argv[0]);
+      ImGui_ImplOpenGL3_Shutdown();
+      ImGui_ImplGlfw_Shutdown();
+
       ImGui::DestroyContext(context);
       break;
     }
@@ -1407,7 +1431,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       if(argc > 4)
         JS_ToInt32(ctx, &popup_max_height_in_items, argv[4]);
 
-      ret = JS_NewBool(ctx, ImGui::Combo(label,  p_value, js_items_getter, &user_data, items_count,popup_max_height_in_items));
+      ret = JS_NewBool(ctx, ImGui::Combo(label, p_value, js_items_getter, &user_data, items_count, popup_max_height_in_items));
       JS_FreeCString(ctx, label);
       break;
     }
@@ -3001,6 +3025,219 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_CFUNC_MAGIC_DEF("PointerGetSet", 1, js_imgui_pointer, POINTER_GETSET),
 };
 
+enum {
+  IMPL_GLFW_INIT_FOR_OPEN_GL,
+  IMPL_GLFW_INIT_FOR_VULKAN,
+  IMPL_GLFW_INIT_FOR_OTHER,
+  IMPL_GLFW_SHUTDOWN,
+  IMPL_GLFW_NEW_FRAME,
+  IMPL_GLFW_WINDOW_FOCUS_CALLBACK,
+  IMPL_GLFW_CURSOR_ENTER_CALLBACK,
+  IMPL_GLFW_MOUSE_BUTTON_CALLBACK,
+  IMPL_GLFW_SCROLL_CALLBACK,
+  IMPL_GLFW_KEY_CALLBACK,
+  IMPL_GLFW_CHAR_CALLBACK,
+  IMPL_GLFW_MONITOR_CALLBACK,
+};
+
+static JSValue
+js_imgui_impl_glfw_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
+  JSValue ret = JS_UNDEFINED;
+  GLFWwindow* window = 0;
+  GLFWmonitor* monitor = 0;
+
+  switch(magic) {
+    case IMPL_GLFW_NEW_FRAME:
+    case IMPL_GLFW_SHUTDOWN: break;
+    case IMPL_GLFW_MONITOR_CALLBACK: {
+      monitor = js_imgui_getobj<GLFWmonitor>(ctx, argv[0]);
+      assert(monitor);
+      break;
+    }
+    default: {
+      window = js_imgui_getobj<GLFWwindow>(ctx, argv[0]);
+      assert(window);
+      break;
+    }
+  }
+
+  switch(magic) {
+    case IMPL_GLFW_INIT_FOR_OPEN_GL: {
+      ImGui_ImplGlfw_InitForOpenGL(window, JS_ToBool(ctx, argv[1]));
+      break;
+    }
+    case IMPL_GLFW_INIT_FOR_VULKAN: {
+      ImGui_ImplGlfw_InitForVulkan(window, JS_ToBool(ctx, argv[1]));
+      break;
+    }
+    case IMPL_GLFW_INIT_FOR_OTHER: {
+      ImGui_ImplGlfw_InitForOther(window, JS_ToBool(ctx, argv[1]));
+      break;
+    }
+    case IMPL_GLFW_SHUTDOWN: {
+      ImGui_ImplGlfw_Shutdown();
+      break;
+    }
+    case IMPL_GLFW_NEW_FRAME: {
+      ImGui_ImplGlfw_NewFrame();
+      break;
+    }
+    case IMPL_GLFW_WINDOW_FOCUS_CALLBACK: {
+      int32_t focused;
+      JS_ToInt32(ctx, &focused, argv[1]);
+      ImGui_ImplGlfw_WindowFocusCallback(window, focused);
+      break;
+    }
+    case IMPL_GLFW_CURSOR_ENTER_CALLBACK: {
+      int32_t entered;
+      JS_ToInt32(ctx, &entered, argv[1]);
+      ImGui_ImplGlfw_CursorEnterCallback(window, entered);
+      break;
+    }
+    case IMPL_GLFW_MOUSE_BUTTON_CALLBACK: {
+      int32_t button, action, mods;
+
+      JS_ToInt32(ctx, &button, argv[1]);
+      JS_ToInt32(ctx, &action, argv[2]);
+      JS_ToInt32(ctx, &mods, argv[3]);
+
+      ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+      break;
+    }
+    case IMPL_GLFW_SCROLL_CALLBACK: {
+      double x, y;
+      JS_ToFloat64(ctx, &x, argv[1]);
+      JS_ToFloat64(ctx, &y, argv[2]);
+      ImGui_ImplGlfw_ScrollCallback(window, x, y);
+      break;
+    }
+    case IMPL_GLFW_KEY_CALLBACK: {
+      int32_t key, scancode, action, mods;
+
+      JS_ToInt32(ctx, &key, argv[1]);
+      JS_ToInt32(ctx, &scancode, argv[2]);
+      JS_ToInt32(ctx, &action, argv[3]);
+      JS_ToInt32(ctx, &mods, argv[4]);
+      ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+      break;
+    }
+    case IMPL_GLFW_CHAR_CALLBACK: {
+      uint32_t c;
+
+      JS_ToUint32(ctx, &c, argv[1]);
+      ImGui_ImplGlfw_CharCallback(window, c);
+      break;
+    }
+    case IMPL_GLFW_MONITOR_CALLBACK: {
+      int32_t event;
+      JS_ToInt32(ctx, &event, argv[1]);
+      ImGui_ImplGlfw_MonitorCallback(monitor, event);
+      break;
+    }
+  }
+
+  return ret;
+}
+
+static const JSCFunctionListEntry js_imgui_impl_glfw[] = {
+    JS_CFUNC_MAGIC_DEF("InitForOpenGL", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_INIT_FOR_OPEN_GL),
+    JS_CFUNC_MAGIC_DEF("InitForVulkan", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_INIT_FOR_VULKAN),
+    JS_CFUNC_MAGIC_DEF("InitForOther", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_INIT_FOR_OTHER),
+    JS_CFUNC_MAGIC_DEF("Shutdown", 0, js_imgui_impl_glfw_functions, IMPL_GLFW_SHUTDOWN),
+    JS_CFUNC_MAGIC_DEF("NewFrame", 0, js_imgui_impl_glfw_functions, IMPL_GLFW_NEW_FRAME),
+    JS_CFUNC_MAGIC_DEF("WindowFocusCallback", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_WINDOW_FOCUS_CALLBACK),
+    JS_CFUNC_MAGIC_DEF("CursorEnterCallback", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_CURSOR_ENTER_CALLBACK),
+    JS_CFUNC_MAGIC_DEF("MouseButtonCallback", 4, js_imgui_impl_glfw_functions, IMPL_GLFW_MOUSE_BUTTON_CALLBACK),
+    JS_CFUNC_MAGIC_DEF("ScrollCallback", 3, js_imgui_impl_glfw_functions, IMPL_GLFW_SCROLL_CALLBACK),
+    JS_CFUNC_MAGIC_DEF("KeyCallback", 5, js_imgui_impl_glfw_functions, IMPL_GLFW_KEY_CALLBACK),
+    JS_CFUNC_MAGIC_DEF("CharCallback", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_CHAR_CALLBACK),
+    JS_CFUNC_MAGIC_DEF("MonitorCallback", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_MONITOR_CALLBACK),
+};
+
+enum {
+  IMPL_OPENGL_INIT,
+  IMPL_OPENGL_SHUTDOWN,
+  IMPL_OPENGL_NEW_FRAME,
+  IMPL_OPENGL_RENDER_DRAW_DATA,
+  IMPL_OPENGL_CREATE_FONTS_TEXTURE,
+  IMPL_OPENGL_DESTROY_FONTS_TEXTURE,
+  IMPL_OPENGL_CREATE_DEVICE_OBJECTS,
+  IMPL_OPENGL_DESTROY_DEVICE_OBJECTS,
+};
+
+static JSValue
+js_imgui_impl_opengl2_call(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
+  JSValue ret = JS_UNDEFINED;
+
+  switch(magic) {
+    case IMPL_OPENGL_INIT: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_Init()); break;
+    case IMPL_OPENGL_SHUTDOWN: ImGui_ImplOpenGL2_Shutdown(); break;
+    case IMPL_OPENGL_NEW_FRAME: ImGui_ImplOpenGL2_NewFrame(); break;
+    case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData()); break;
+    case IMPL_OPENGL_CREATE_FONTS_TEXTURE: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_CreateFontsTexture()); break;
+    case IMPL_OPENGL_DESTROY_FONTS_TEXTURE: ImGui_ImplOpenGL2_DestroyFontsTexture(); break;
+    case IMPL_OPENGL_CREATE_DEVICE_OBJECTS: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_CreateDeviceObjects()); break;
+    case IMPL_OPENGL_DESTROY_DEVICE_OBJECTS: ImGui_ImplOpenGL2_DestroyDeviceObjects(); break;
+  }
+
+  return ret;
+}
+
+static const JSCFunctionListEntry js_imgui_impl_opengl2[] = {
+    JS_CFUNC_MAGIC_DEF("Init", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_INIT),
+    JS_CFUNC_MAGIC_DEF("Shutdown", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_SHUTDOWN),
+    JS_CFUNC_MAGIC_DEF("NewFrame", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_NEW_FRAME),
+    JS_CFUNC_MAGIC_DEF("RenderDrawData", 1, js_imgui_impl_opengl2_call, IMPL_OPENGL_RENDER_DRAW_DATA),
+    JS_CFUNC_MAGIC_DEF("CreateFontsTexture", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_CREATE_FONTS_TEXTURE),
+    JS_CFUNC_MAGIC_DEF("DestroyFontsTexture", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_DESTROY_FONTS_TEXTURE),
+    JS_CFUNC_MAGIC_DEF("CreateDeviceObjects", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_CREATE_DEVICE_OBJECTS),
+    JS_CFUNC_MAGIC_DEF("DestroyDeviceObjects", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_DESTROY_DEVICE_OBJECTS),
+};
+
+static JSValue
+js_imgui_impl_opengl3_call(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
+  JSValue ret = JS_UNDEFINED;
+
+  switch(magic) {
+    case IMPL_OPENGL_INIT: {
+      const char* glsl_version = 0;
+      if(argc > 0)
+        glsl_version = JS_ToCString(ctx, argv[0]);
+
+      ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_Init(glsl_version));
+      if(glsl_version)
+        JS_FreeCString(ctx, glsl_version);
+      break;
+    }
+    case IMPL_OPENGL_SHUTDOWN: ImGui_ImplOpenGL3_Shutdown(); break;
+    case IMPL_OPENGL_NEW_FRAME: ImGui_ImplOpenGL3_NewFrame(); break;
+    case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); break;
+    case IMPL_OPENGL_CREATE_FONTS_TEXTURE: ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_CreateFontsTexture()); break;
+    case IMPL_OPENGL_DESTROY_FONTS_TEXTURE: ImGui_ImplOpenGL3_DestroyFontsTexture(); break;
+    case IMPL_OPENGL_CREATE_DEVICE_OBJECTS: ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_CreateDeviceObjects()); break;
+    case IMPL_OPENGL_DESTROY_DEVICE_OBJECTS: ImGui_ImplOpenGL3_DestroyDeviceObjects(); break;
+  }
+
+  return ret;
+}
+
+static const JSCFunctionListEntry js_imgui_impl_opengl3[] = {
+    JS_CFUNC_MAGIC_DEF("Init", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_INIT),
+    JS_CFUNC_MAGIC_DEF("Shutdown", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_SHUTDOWN),
+    JS_CFUNC_MAGIC_DEF("NewFrame", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_NEW_FRAME),
+    JS_CFUNC_MAGIC_DEF("RenderDrawData", 1, js_imgui_impl_opengl3_call, IMPL_OPENGL_RENDER_DRAW_DATA),
+    JS_CFUNC_MAGIC_DEF("CreateFontsTexture", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_CREATE_FONTS_TEXTURE),
+    JS_CFUNC_MAGIC_DEF("DestroyFontsTexture", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_DESTROY_FONTS_TEXTURE),
+    JS_CFUNC_MAGIC_DEF("CreateDeviceObjects", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_CREATE_DEVICE_OBJECTS),
+    JS_CFUNC_MAGIC_DEF("DestroyDeviceObjects", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_DESTROY_DEVICE_OBJECTS),
+};
+
+static const JSCFunctionListEntry js_imgui_static_impls[] = {
+    JS_OBJECT_DEF("ImplGlfw", js_imgui_impl_glfw, countof(js_imgui_impl_glfw), JS_PROP_ENUMERABLE),
+    JS_OBJECT_DEF("ImplOpenGL2", js_imgui_impl_opengl2, countof(js_imgui_impl_opengl2), JS_PROP_ENUMERABLE),
+    JS_OBJECT_DEF("ImplOpenGL3", js_imgui_impl_opengl3, countof(js_imgui_impl_opengl3), JS_PROP_ENUMERABLE),
+};
+
 #include "quickjs-imgui-inputtextcallbackdata.hpp"
 
 extern "C" {
@@ -3078,16 +3315,23 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
     JS_SetModuleExport(ctx, m, "ImFont", imfont_ctor);
     JS_SetModuleExport(ctx, m, "ImFontAtlas", imfontatlas_ctor);
     JS_SetModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
+    JS_SetModuleExportList(ctx, m, js_imgui_static_impls, countof(js_imgui_static_impls));
   }
 
   return 0;
 }
 
+extern "C" const char* get_glsl_version(void);
+
 VISIBLE JSModuleDef*
 js_init_module(JSContext* ctx, const char* module_name) {
   JSModuleDef* m;
+
   if(!(m = JS_NewCModule(ctx, module_name, &js_imgui_init)))
     return m;
+
+  glsl_version = get_glsl_version();
+
   JS_AddModuleExport(ctx, m, "ImGuiIO");
   JS_AddModuleExport(ctx, m, "ImGuiStyle");
   JS_AddModuleExport(ctx, m, "ImGuiInputTextCallbackData");
@@ -3095,6 +3339,7 @@ js_init_module(JSContext* ctx, const char* module_name) {
   JS_AddModuleExport(ctx, m, "ImFont");
   JS_AddModuleExport(ctx, m, "ImFontAtlas");
   JS_AddModuleExportList(ctx, m, js_imgui_static_funcs, countof(js_imgui_static_funcs));
+  JS_AddModuleExportList(ctx, m, js_imgui_static_impls, countof(js_imgui_static_impls));
   return m;
 }
 }
