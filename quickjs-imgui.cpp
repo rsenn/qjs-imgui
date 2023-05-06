@@ -164,6 +164,37 @@ js_imgui_input_text_args(JSContext* ctx, InputTextUserData& context, int argc, J
   return std::make_pair(cb, user_data);
 }
 
+template<typename T> struct SliderArgs {
+  T vmin, vmax;
+  const char* format;
+  bool format_allocated;
+  ImGuiSliderFlags flags;
+
+  ~SliderArgs() {
+    if(format && format_allocated) {
+      JS_FreeCString(ctx, format);
+      format = 0;
+    }
+  }
+
+  SliderArgs(JSContext* _ctx, int argc, JSValueConst argv[]) : ctx(_ctx) {
+    vmin = JSVal<T>::to(ctx, argv[0]);
+    vmax = JSVal<T>::to(ctx, argv[1]);
+    if(argc > 2 && !js_is_null_or_undefined(argv[2])) {
+      format = JS_ToCString(ctx, argv[2]);
+      format_allocated = true;
+    } else {
+      format = "%.3f";
+    }
+
+    if(argc > 3)
+      flags = JSVal<int32_t>::to(ctx, argv[3]);
+  }
+
+private:
+  JSContext* ctx;
+};
+
 #include "quickjs-imgui-style.hpp"
 
 enum {
@@ -1197,7 +1228,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       }
       case IMGUI_TEXT_UNFORMATTED: {
         const char *text = JS_ToCString(ctx, argv[0]), *text_end = 0;
-        if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+        if(argc >= 2 && !js_is_null_or_undefined(argv[1]))
           text_end = JS_ToCString(ctx, argv[1]);
         ImGui::TextUnformatted(text, text_end);
         JS_FreeCString(ctx, text);
@@ -1363,7 +1394,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         JS_ToFloat64(ctx, &fraction, argv[0]);
         if(argc >= 2)
           size_arg = js_imgui_getimvec2(ctx, argv[1]);
-        if(argc >= 3 && !(JS_IsNull(argv[2]) || JS_IsUndefined(argv[2])))
+        if(argc >= 3 && !js_is_null_or_undefined(argv[2]))
           overlay = JS_ToCString(ctx, argv[2]);
         ImGui::ProgressBar(fraction, size_arg, overlay);
         if(overlay)
@@ -1401,12 +1432,26 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         JS_FreeCString(ctx, label);
         break;
       }
-      case IMGUI_DRAG_FLOAT: break;
+      case IMGUI_DRAG_FLOAT: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<float> p_value(ctx, argv[1]);
+        float v_speed = JSVal<float>::to(ctx, argv[2]);
+        SliderArgs<float> sa(ctx, argc - 3, argv + 3);
+        ret = JS_NewBool(ctx, ImGui::DragFloat(label, p_value, v_speed, sa.vmin, sa.vmax, sa.format ? sa.format : "%.3f", sa.flags));
+        break;
+      }
       case IMGUI_DRAG_FLOAT2: break;
       case IMGUI_DRAG_FLOAT3: break;
       case IMGUI_DRAG_FLOAT4: break;
       case IMGUI_DRAG_FLOAT_RANGE2: break;
-      case IMGUI_DRAG_INT: break;
+      case IMGUI_DRAG_INT: {
+        const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<int32_t> p_value(ctx, argv[1]);
+        float v_speed = JSVal<float>::to(ctx, argv[2]);
+        SliderArgs<int32_t> sa(ctx, argc - 3, argv + 3);
+        ret = JS_NewBool(ctx, ImGui::DragInt(label, p_value, v_speed, sa.vmin, sa.vmax, sa.format ? sa.format : "%.3f", sa.flags));
+        break;
+      }
       case IMGUI_DRAG_INT2: break;
       case IMGUI_DRAG_INT3: break;
       case IMGUI_DRAG_INT4: break;
@@ -1416,104 +1461,39 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       case IMGUI_SLIDER_FLOAT: {
         const char* label = JS_ToCString(ctx, argv[0]);
         OutputArg<float> p_value(ctx, argv[1]);
-        double vmin = 0, vmax = 1;
-        const char* format = 0;
-        int32_t flags = 0;
-
-        JS_ToFloat64(ctx, &vmin, argv[2]);
-        JS_ToFloat64(ctx, &vmax, argv[3]);
-        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-          format = JS_ToCString(ctx, argv[4]);
-        if(argc > 5)
-          JS_ToInt32(ctx, &flags, argv[5]);
-
-        ret = JS_NewBool(ctx, ImGui::SliderFloat(label, p_value, vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
-
-        if(format)
-          JS_FreeCString(ctx, format);
+        SliderArgs<float> sa(ctx, argc - 2, argv + 2);
+        ret = JS_NewBool(ctx, ImGui::SliderFloat(label, p_value, sa.vmin, sa.vmax, sa.format ? sa.format : "%.3f", sa.flags));
         break;
       }
       case IMGUI_SLIDER_FLOAT2: {
         const char* label = JS_ToCString(ctx, argv[0]);
         OutputArg<std::array<float, 2>> p_values(ctx, argv[1]);
-        double vmin = 0, vmax = 1;
-        const char* format = 0;
-        int32_t flags = 0;
-
-        JS_ToFloat64(ctx, &vmin, argv[2]);
-        JS_ToFloat64(ctx, &vmax, argv[3]);
-        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-          format = JS_ToCString(ctx, argv[4]);
-        if(argc > 5)
-          JS_ToInt32(ctx, &flags, argv[5]);
-
-        ret = JS_NewBool(ctx, ImGui::SliderFloat2(label, static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
-
-        if(format)
-          JS_FreeCString(ctx, format);
+        SliderArgs<float> sa(ctx, argc - 2, argv + 2);
+        ret = JS_NewBool(ctx, ImGui::SliderFloat2(label, static_cast<float*>(p_values), sa.vmin, sa.vmax, sa.format ? sa.format : "%.3f", sa.flags));
         break;
       }
       case IMGUI_SLIDER_FLOAT3: {
         const char* label = JS_ToCString(ctx, argv[0]);
         OutputArg<std::array<float, 3>> p_values(ctx, argv[1]);
-        double vmin = 0, vmax = 1;
-        const char* format = 0;
-        int32_t flags = 0;
-
-        JS_ToFloat64(ctx, &vmin, argv[2]);
-        JS_ToFloat64(ctx, &vmax, argv[3]);
-        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-          format = JS_ToCString(ctx, argv[4]);
-        if(argc > 5)
-          JS_ToInt32(ctx, &flags, argv[5]);
-
-        ret = JS_NewBool(ctx, ImGui::SliderFloat3(label, static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
-
-        if(format)
-          JS_FreeCString(ctx, format);
+        SliderArgs<float> sa(ctx, argc - 2, argv + 2);
+        ret = JS_NewBool(ctx, ImGui::SliderFloat3(label, static_cast<float*>(p_values), sa.vmin, sa.vmax, sa.format ? sa.format : "%.3f", sa.flags));
         break;
       }
       case IMGUI_SLIDER_FLOAT4: {
         const char* label = JS_ToCString(ctx, argv[0]);
         OutputArg<std::array<float, 4>> p_values(ctx, argv[1]);
-        double vmin = 0, vmax = 1;
-        const char* format = 0;
-        int32_t flags = 0;
-
-        JS_ToFloat64(ctx, &vmin, argv[2]);
-        JS_ToFloat64(ctx, &vmax, argv[3]);
-        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-          format = JS_ToCString(ctx, argv[4]);
-        if(argc > 5)
-          JS_ToInt32(ctx, &flags, argv[5]);
-
-        ret = JS_NewBool(ctx, ImGui::SliderFloat3(label, static_cast<float*>(p_values), vmin, vmax, format ? format : "%.3f", ImGuiSliderFlags(flags)));
-
-        if(format)
-          JS_FreeCString(ctx, format);
+        SliderArgs<float> sa(ctx, argc - 2, argv + 2);
+        ret = JS_NewBool(ctx, ImGui::SliderFloat3(label, static_cast<float*>(p_values), sa.vmin, sa.vmax, sa.format ? sa.format : "%.3f", sa.flags));
         break;
       }
       case IMGUI_SLIDER_ANGLE: break;
       case IMGUI_SLIDER_INT: {
-   const char* label = JS_ToCString(ctx, argv[0]);
+        const char* label = JS_ToCString(ctx, argv[0]);
         OutputArg<int32_t> p_value(ctx, argv[1]);
-        int32_t vmin = 0, vmax = INT32_MAX;
-        const char* format = 0;
-        int32_t flags = 0;
-
-        JS_ToInt32(ctx, &vmin, argv[2]);
-        JS_ToInt32(ctx, &vmax, argv[3]);
-        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
-          format = JS_ToCString(ctx, argv[4]);
-        if(argc > 5)
-          JS_ToInt32(ctx, &flags, argv[5]);
-
-        ret = JS_NewBool(ctx, ImGui::SliderFloat(label, p_value, vmin, vmax, format ? format : "%"PRId32, ImGuiSliderFlags(flags)));
-
-        if(format)
-          JS_FreeCString(ctx, format);
-      break;
-    }
+        SliderArgs<int32_t> sa(ctx, argc - 2, argv + 2);
+        ret = JS_NewBool(ctx, ImGui::SliderInt(label, p_value, sa.vmin, sa.vmax, sa.format ? sa.format : "%.3f", sa.flags));
+        break;
+      }
       case IMGUI_SLIDER_INT2: break;
       case IMGUI_SLIDER_INT3: break;
       case IMGUI_SLIDER_INT4: break;
@@ -1600,7 +1580,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
 
         JS_ToFloat64(ctx, &step, argv[2]);
         JS_ToFloat64(ctx, &step_fast, argv[3]);
-        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+        if(argc > 4 && !js_is_null_or_undefined(argv[4]))
           format = JS_ToCString(ctx, argv[4]);
         if(argc > 5)
           JS_ToInt32(ctx, &flags, argv[5]);
@@ -1641,7 +1621,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         JS_ToFloat64(ctx, &step, argv[2]);
         JS_ToFloat64(ctx, &step_fast, argv[3]);
 
-        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+        if(argc > 4 && !js_is_null_or_undefined(argv[4]))
           format = JS_ToCString(ctx, argv[4]);
         if(argc > 5)
           JS_ToInt32(ctx, &flags, argv[5]);
@@ -1665,7 +1645,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         js_to_scalar(ctx, &step, argv[3], type);
         js_to_scalar(ctx, &step_fast, argv[4], type);
 
-        if(argc > 5 && !(JS_IsUndefined(argv[5]) || JS_IsNull(argv[5])))
+        if(argc > 5 && !js_is_null_or_undefined(argv[5]))
           format = JS_ToCString(ctx, argv[5]);
         if(argc > 6)
           JS_ToInt32(ctx, &flags, argv[6]);
@@ -1843,9 +1823,9 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         const char *label = nullptr, *shortcut = nullptr;
         BOOL enabled = TRUE;
 
-        if(argc > 0 && !(JS_IsNull(argv[0]) || JS_IsUndefined(argv[0])))
+        if(argc > 0 && !js_is_null_or_undefined(argv[0]))
           label = JS_ToCString(ctx, argv[0]);
-        if(argc > 1 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+        if(argc > 1 && !js_is_null_or_undefined(argv[1]))
           shortcut = JS_ToCString(ctx, argv[1]);
         if(argc > 3)
           enabled = JS_ToBool(ctx, argv[3]);
@@ -2088,7 +2068,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         bool border = true;
         if(argc >= 1)
           JS_ToInt32(ctx, &count, argv[0]);
-        if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+        if(argc >= 2 && !js_is_null_or_undefined(argv[1]))
           id = JS_ToCString(ctx, argv[1]);
         if(argc >= 3)
           border = JS_ToBool(ctx, argv[2]);
@@ -2193,7 +2173,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         const char* filename = 0;
         if(argc >= 1)
           JS_ToInt32(ctx, &auto_open_depth, argv[0]);
-        if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+        if(argc >= 2 && !js_is_null_or_undefined(argv[1]))
           filename = JS_ToCString(ctx, argv[1]);
         ImGui::LogToFile(auto_open_depth, filename);
         if(filename)
@@ -2402,7 +2382,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         const char *text = JS_ToCString(ctx, argv[0]), *text_end = 0;
         bool hide_text_after_double_hash = false;
         double wrap_width = -1.0f;
-        if(argc >= 2 && !(JS_IsNull(argv[1]) || JS_IsUndefined(argv[1])))
+        if(argc >= 2 && !js_is_null_or_undefined(argv[1]))
           text_end = JS_ToCString(ctx, argv[1]);
         if(argc >= 3)
           hide_text_after_double_hash = JS_ToBool(ctx, argv[2]);

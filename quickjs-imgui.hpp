@@ -9,6 +9,7 @@
 #include <vector>
 #include <algorithm>
 #include <functional>
+#include <ranges>
 
 struct imgui;
 
@@ -44,6 +45,11 @@ struct ItemsGetterUserData {
 };
 
 typedef bool ItemsGetterFunction(void* data, int idx, const char** out_text);
+
+static inline bool
+js_is_null_or_undefined(JSValueConst v) {
+  return JS_IsNull(v) || JS_IsUndefined(v);
+}
 
 bool
 js_items_getter(void* data, int idx, const char** out_text) {
@@ -459,6 +465,70 @@ template<typename T, size_t N> struct JSVal<std::array<T, N>> {
   }
 };
 
+template<typename T, typename V>
+static inline void
+js_read_property(JSContext* ctx, JSValueConst obj, const T& name, V& value) {
+  JSValue val = js_get_property(ctx, obj, name);
+  value = JSVal<V>::to(ctx, val);
+  JS_FreeValue(ctx, val);
+}
+
+static inline uint8_t*
+js_get_arraybuffer(JSContext* ctx, size_t& size, JSValueConst obj, size_t minimum_size = 0) {
+  JSAtom atom = JS_NewAtom(ctx, "byteOffset");
+  uint8_t* ptr;
+
+  if(JS_HasProperty(ctx, obj, atom)) {
+    uint32_t offset = 0, length = 0;
+    js_read_property(ctx, obj, atom, offset);
+    JS_FreeAtom(ctx, atom);
+    atom = JS_NewAtom(ctx, "byteLength");
+    js_read_property(ctx, obj, atom, length);
+    JS_FreeAtom(ctx, atom);
+    atom = JS_NewAtom(ctx, "buffer");
+    JSValue value = JS_GetProperty(ctx, obj, atom);
+    if((ptr = JS_GetArrayBuffer(ctx, &size, value))) {
+      ptr += offset;
+      size = length;
+    }
+    JS_FreeValue(ctx, value);
+  } else {
+    ptr = JS_GetArrayBuffer(ctx, &size, obj);
+  }
+
+  if(minimum_size > size) {
+    JS_ThrowRangeError(ctx, "minimum size of %zu > %zu", minimum_size, size);
+    ptr = nullptr;
+  }
+
+  JS_FreeAtom(ctx, atom);
+  return ptr;
+}
+
+template<typename T> class JSRange /*: std::ranges::view_interface<JSRange<T>>*/ {
+public:
+  JSRange() = default;
+  JSRange(JSContext* ctx, JSValueConst value) {
+    size_t len;
+
+    if((m_begin = reinterpret_cast<T*>(js_get_arraybuffer(ctx, len, value))))
+      m_end = m_begin + len / sizeof(T);
+  }
+
+  T*
+  begin() const {
+    return m_begin;
+  }
+
+  T*
+  end() const {
+    return m_end;
+  }
+
+private:
+  T *m_begin, *m_end;
+};
+
 class JSRef {
 public:
   JSValueConst param;
@@ -577,97 +647,118 @@ void
 set_scalar<ImGuiDataType_S8>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S8>::value_type value) {
   data.s8 = value;
 }
+
 template<>
 void
 set_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U8>::value_type value) {
   data.u8 = value;
 }
+
 template<>
 void
 set_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S16>::value_type value) {
   data.s16 = value;
 }
+
 template<>
 void
 set_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U16>::value_type value) {
   data.u16 = value;
 }
+
 template<>
 void
 set_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S32>::value_type value) {
   data.s32 = value;
 }
+
 template<>
 void
 set_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U32>::value_type value) {
   data.u32 = value;
 }
+
 template<>
 void
 set_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_S64>::value_type value) {
   data.s64 = value;
 }
+
 template<>
 void
 set_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_U64>::value_type value) {
   data.u64 = value;
 }
+
 template<>
 void
 set_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_Float>::value_type value) {
   data.f32 = value;
 }
+
 template<>
 void
 set_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion& data, ScalarType<ImGuiDataType_Double>::value_type value) {
   data.f64 = value;
 }
-template<enum ImGuiDataType_ type> typename ScalarType<type>::value_type get_scalar(union ImGuiDataTypeUnion const& data);
+
+template<enum ImGuiDataType_ type> typename ScalarType<type>::value_type 
+get_scalar(union ImGuiDataTypeUnion const& data);
+
 template<>
 ScalarType<ImGuiDataType_S8>::value_type
 get_scalar<ImGuiDataType_S8>(union ImGuiDataTypeUnion const& data) {
   return data.s8;
 }
+
 template<>
 ScalarType<ImGuiDataType_U8>::value_type
 get_scalar<ImGuiDataType_U8>(union ImGuiDataTypeUnion const& data) {
   return data.u8;
 }
+
 template<>
 ScalarType<ImGuiDataType_S16>::value_type
 get_scalar<ImGuiDataType_S16>(union ImGuiDataTypeUnion const& data) {
   return data.s16;
 }
+
 template<>
 ScalarType<ImGuiDataType_U16>::value_type
 get_scalar<ImGuiDataType_U16>(union ImGuiDataTypeUnion const& data) {
   return data.u16;
 }
+
 template<>
 ScalarType<ImGuiDataType_S32>::value_type
 get_scalar<ImGuiDataType_S32>(union ImGuiDataTypeUnion const& data) {
   return data.s32;
 }
+
 template<>
 ScalarType<ImGuiDataType_U32>::value_type
 get_scalar<ImGuiDataType_U32>(union ImGuiDataTypeUnion const& data) {
   return data.u32;
 }
+
 template<>
 ScalarType<ImGuiDataType_S64>::value_type
 get_scalar<ImGuiDataType_S64>(union ImGuiDataTypeUnion const& data) {
   return data.s64;
 }
+
 template<>
 ScalarType<ImGuiDataType_U64>::value_type
 get_scalar<ImGuiDataType_U64>(union ImGuiDataTypeUnion const& data) {
   return data.u64;
 }
+
 template<>
 ScalarType<ImGuiDataType_Float>::value_type
 get_scalar<ImGuiDataType_Float>(union ImGuiDataTypeUnion const& data) {
   return data.f32;
 }
+
 template<>
 ScalarType<ImGuiDataType_Double>::value_type
 get_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion const& data) {
@@ -749,11 +840,8 @@ public:
   size_t len;
 
   OutputArg(JSContext* ctx, JSValueConst _arg) {
-    JSAtom bufatom = JS_NewAtom(ctx, "buffer");
-    JSValue bufval = JS_HasProperty(ctx, _arg, bufatom) ? JS_GetProperty(ctx, _arg, bufatom) : JS_DupValue(ctx, _arg);
-    uint8_t* bufptr = JS_GetArrayBuffer(ctx, &len, bufval);
+    uint8_t* bufptr = js_get_arraybuffer(ctx, len, _arg);
     ptr = reinterpret_cast<union ImGuiDataTypeUnion*>(bufptr);
-    JS_FreeValue(ctx, bufval);
   }
   ~OutputArg() {}
 

@@ -9,6 +9,8 @@ option(IMPL_OPENGL_ES2 OFF "Use OpenGL ES2")
 
 cmake_minimum_required(VERSION 3.2)
 
+set(CMAKE_CXX_STANDARD c++20)
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/UseMultiArch.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/functions.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/check-flags.cmake)
