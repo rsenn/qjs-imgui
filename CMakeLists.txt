@@ -92,7 +92,7 @@ endif(USE_GL3W)
 set(imgui_LIBRARIES ${GLFW_LIBRARY} ${OPENGL_gl_LIBRARY})
 #set(imgui_DEPS gl3w)
 
-set(IMGUI_SOURCES imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp
+set(IMGUI_SOURCES imgui/imgui.cpp imgui/imgui.h imgui/imgui_draw.cpp imgui/imgui_tables.cpp
                   imgui/imgui_widgets.cpp imgui/imgui_demo.cpp)
 
 if(USE_GL3W)
@@ -115,7 +115,7 @@ endif(IMGUI_DEMO)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 #add_definitions(-DIMGUI_USER_CONFIG=\"quickjs-imconfig.hpp\")
 
-file(GLOB QJS_IMGUI_SOURCES quickjs-imgui.cpp *.hpp ${IMGUI_SOURCES} 
+file(GLOB QJS_IMGUI_SOURCES quickjs-imgui.cpp *.hpp ${IMGUI_SOURCES}
   imgui/backends/imgui_impl_glfw.cpp
   imgui/backends/imgui_impl_glfw.h
   imgui/backends/imgui_impl_opengl*.cpp
