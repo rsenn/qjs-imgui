@@ -247,7 +247,7 @@ function main() {
     ImGui.InputScalar('input double', ImGui.DataType.Double, f64_v, 1, 10);
 
     ImGui.InputTextMultiline('Text', text_buf2, text_buf2.byteLength, [100, 30], ImGui.InputTextFlags.CallbackAlways, data => console.log('InputTextMultiline event', data));
-    ImGui.InputFloat('Float', float_value, 1, 10, null, ImGui.InputTextFlags.CallbackAlways, data => console.log('InputFloat event', data));
+    ImGui.InputFloat('Float', float_value, 1, 10, null, 0); //ImGui.InputTextFlags.CallbackAlways, data => console.log('InputFloat event', data));
     false &&
       ImGui.InputText('Text', text_buf, text_buf.byteLength, ImGui.InputTextFlags.CallbackAlways, data => {
         /* prettier-ignore */ const {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection } = data;
