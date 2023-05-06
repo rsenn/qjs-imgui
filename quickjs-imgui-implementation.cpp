@@ -10,14 +10,11 @@
 #define IMGUI_IMPL_OPENGL_LOADER_CUSTOM
 
 #else
-#ifndef IMGUI_IMPL_OPENGL_ES2
-#define IMGUI_IMPL_OPENGL_ES2
-#endif
 #endif
 
 #include <GLFW/glfw3.h>
 
-//#define IMGUI_IMPL_OPENGL_LOADER_CUSTOM
+#undef IMGUI_IMPL_OPENGL_LOADER_CUSTOM
 
 #include "imgui/backends/imgui_impl_glfw.cpp"
 #include "imgui/backends/imgui_impl_opengl2.cpp"

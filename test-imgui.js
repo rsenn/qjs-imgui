@@ -176,7 +176,8 @@ function main() {
   ])
     Window.hint(prop, value);
 
-  window = context.current = new Window(800, 600, 'ImGui test');
+  window = context.current = ImGui.ImplGlfw.CreateWindow = new Window(1280, 800, 'ImGui test');
+  console.log('new Window() =', window.id);
 
   window.handleChar = c => {
     let s = String.fromCharCode(c);
@@ -186,8 +187,6 @@ function main() {
       console.log('handleChar', { c, s });
     }
   };
-
-  //window ??= [1280,800];
 
   let ok = nvg.CreateGL3(nvg.STENCIL_STROKES | nvg.ANTIALIAS | nvg.DEBUG);
   console.log('nvg.CreateGL3() =', ok);
@@ -207,9 +206,7 @@ function main() {
 
     ImGui.Begin('This is a window', null, ImGui.WindowFlags.MenuBar);
 
-    ImGui.SetWindowSize([...window.size]);
-
-    //console.log('ImGui.GetContentRegionAvail() =', ImGui.GetContentRegionAvail());
+    ImGui.SetWindowSize([800, 600]);
 
     ImGui.PushItemWidth(ImGui.GetFontSize() * -12);
 
@@ -220,7 +217,6 @@ function main() {
     ImGui.Checkbox('Light Background', show_light_bg);
     ImGui.SliderFloat('Slider', slider_value, 0, 300, '%3.0f', 0);
     ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
-
     let items = ['beer', 'salad', 'pizza', 'pineapple'];
 
     ImGui.Combo('Combo', combo_value, idx => items[idx], items.length);
@@ -301,6 +297,7 @@ function main() {
       }
       ImGui.EndMenuBar();
     }
+    console.log('ImGui.GetContentRegionAvail() =', ImGui.GetContentRegionAvail());
 
     ImGui.End();
 
@@ -329,15 +326,11 @@ function main() {
       nvg.EndFrame();
     }
 
-    nvg.BeginFrame(...window.size, 1);
-
     let data = ImGui.GetDrawData();
     ImGui.RenderDrawData(data);
 
-    nvg.EndFrame();
-
     let { id, Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale } = data;
-    //console.log('data', id, {Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale });
+    console.log('data', id, { Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale });
 
     window.swapBuffers();
   }

@@ -5,6 +5,7 @@ message("Building project [1;31m${PROJECT_NAME}[0m")
 option(BUILD_GLFW OFF "Build GLFW from sources")
 option(USE_GL3W OFF "Use GL3W instead of internal loader")
 option(USE_GLEW OFF "Use GLEW instead of internal loader")
+option(IMPL_OPENGL_ES2 OFF "Use OpenGL ES2")
 
 cmake_minimum_required(VERSION 3.2)
 
@@ -57,7 +58,9 @@ if(USE_GL3W)
 endif(USE_GL3W)
 
 if(NOT USE_GLEW AND NOT USE_GL3W)
-  add_definitions(-DIMGUI_IMPL_OPENGL_ES2)
+  if(IMPL_OPENGL_ES2)
+    add_definitions(-DIMGUI_IMPL_OPENGL_ES2)
+  endif(IMPL_OPENGL_ES2)
 endif(NOT USE_GLEW AND NOT USE_GL3W)
 
 #message(STATUS "GLEW_LIBRARY: ${GLEW_LIBRARY}")
@@ -110,20 +113,10 @@ endif(IMGUI_DEMO)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 #add_definitions(-DIMGUI_USER_CONFIG=\"quickjs-imconfig.hpp\")
 
-make_module(
-  imgui
-  quickjs-imgui.cpp
-  #quickjs-imgui-implementation.cpp
-  quickjs-imfontatlas.hpp
-  quickjs-imfont.hpp
-  quickjs-imgui-constants.hpp
-  quickjs-imgui.hpp
-  quickjs-imgui-inputtextcallbackdata.hpp
-  quickjs-imgui-io.hpp
-  quickjs-imgui-payload.hpp
-  quickjs-imgui-pointer.hpp
-  quickjs-imgui-style.hpp
-  ${IMGUI_SOURCES}
+file(GLOB QJS_IMGUI_SOURCES quickjs-imgui.cpp *.hpp ${IMGUI_SOURCES} 
   imgui/backends/imgui_impl_glfw.cpp
-  imgui/backends/imgui_impl_opengl2.cpp
-  imgui/backends/imgui_impl_opengl3.cpp)
+  imgui/backends/imgui_impl_glfw.h
+  imgui/backends/imgui_impl_opengl*.cpp
+  imgui/backends/imgui_impl_opengl*.h)
+
+make_module(imgui ${QJS_IMGUI_SOURCES})

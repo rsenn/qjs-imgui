@@ -66,66 +66,6 @@ js_imgui_free_func(JSRuntime* rt, void* opaque, void* ptr) {
   ImGui::MemFree(ptr);
 }
 
-static ImVec2
-js_imgui_getimvec2(JSContext* ctx, JSValueConst value) {
-  JSValue xval = JS_UNDEFINED, yval = JS_UNDEFINED;
-  double x, y;
-  if(JS_IsArray(ctx, value)) {
-    xval = JS_GetPropertyUint32(ctx, value, 0);
-    yval = JS_GetPropertyUint32(ctx, value, 1);
-  } else if(JS_IsObject(value)) {
-    xval = JS_GetPropertyStr(ctx, value, "x");
-    yval = JS_GetPropertyStr(ctx, value, "y");
-  }
-  JS_ToFloat64(ctx, &x, xval);
-  JS_ToFloat64(ctx, &y, yval);
-  return ImVec2(x, y);
-}
-
-static ImVec4
-js_imgui_getimvec4(JSContext* ctx, JSValueConst value) {
-  JSValue xval = JS_UNDEFINED, yval = JS_UNDEFINED, zval = JS_UNDEFINED, wval = JS_UNDEFINED;
-  double x, y, z, w;
-  if(JS_IsArray(ctx, value)) {
-    xval = JS_GetPropertyUint32(ctx, value, 0);
-    yval = JS_GetPropertyUint32(ctx, value, 1);
-    zval = JS_GetPropertyUint32(ctx, value, 2);
-    wval = JS_GetPropertyUint32(ctx, value, 3);
-  } else if(JS_IsObject(value)) {
-    xval = JS_GetPropertyStr(ctx, value, "x");
-    yval = JS_GetPropertyStr(ctx, value, "y");
-    zval = JS_GetPropertyStr(ctx, value, "z");
-    wval = JS_GetPropertyStr(ctx, value, "w");
-  }
-  JS_ToFloat64(ctx, &x, xval);
-  JS_ToFloat64(ctx, &y, yval);
-  JS_ToFloat64(ctx, &x, zval);
-  JS_ToFloat64(ctx, &y, wval);
-  return ImVec4(x, y, z, w);
-}
-
-static ImVec4
-js_imgui_getcolor(JSContext* ctx, JSValueConst value) {
-  ImVec4 vec = {0, 0, 0, 0};
-  if(JS_IsObject(value)) {
-    vec = js_imgui_getimvec4(ctx, value);
-  } else if(JS_IsNumber(value)) {
-    uint32_t color = 0;
-    JS_ToUint32(ctx, &color, value);
-    vec = ImGui::ColorConvertU32ToFloat4(color);
-  } else if(JS_IsString(value)) {
-    const char *p, *str = JS_ToCString(ctx, value);
-    uint32_t color;
-    for(p = str; *p; p++)
-      if(isxdigit(*p))
-        break;
-    color = strtoul(p, 0, 16);
-    vec = ImGui::ColorConvertU32ToFloat4(color);
-    JS_FreeCString(ctx, str);
-  }
-  return vec;
-}
-
 static ImTextureID
 js_imgui_gettexture(JSContext* ctx, JSValueConst value) {
   if(JS_IsNumber(value)) {
@@ -555,34 +495,6 @@ enum {
   IMGUI_POINTER,
 };
 
-static std::string
-imgui_impl_type(const std::string& str) {
-  std::string::size_type pos, pos2;
-
-  pos = str.find("Impl");
-  const auto start = str.begin() + (pos == std::string::npos ? 0 : pos + 4);
-
-  pos2 = str.find_first_of("0123456789");
-  const auto end = pos2 == std::string::npos ? str.end() : str.begin() + pos2;
-
-  return std::string(start, end);
-}
-
-static JSValue
-js_imgui_getter(JSContext* ctx, JSValueConst this_val, int magic) {
-  JSValue ret = JS_UNDEFINED;
-
-  switch(magic) {
-    case IMGUI_RENDER_DRAW_DATA: {
-      if(imgui_implementations.size())
-        ret = js_get_property(ctx, imgui_implementations, "RenderDrawData");
-      break;
-    }
-  }
-
-  return ret;
-}
-
 static JSValue
 js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
   JSValue ret = JS_UNDEFINED;
@@ -701,13 +613,13 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
           ret = JS_ThrowInternalError(ctx, "supply an implementation that has .RenderDrawData() to ImGui::Init()");
           break;
         }
-        //std::cout << "Render Impl: " << js_get_tostringtag(ctx, *it) << std::endl;
+        // std::cout << "Render Impl: " << js_get_tostringtag(ctx, *it) << std::endl;
         js_invoke(ctx, *it, "NewFrame");
 
         for(auto it2 = imgui_implementations.begin(); it2 != imgui_implementations.end(); ++it2) {
           if(it2 == it)
             continue;
-          //std::cout << "Other Impl: " << js_get_tostringtag(ctx, *it2) << std::endl;
+          // std::cout << "Other Impl: " << js_get_tostringtag(ctx, *it2) << std::endl;
           js_invoke(ctx, *it2, "NewFrame");
         }
 
@@ -3081,7 +2993,6 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_CFUNC_MAGIC_DEF("PointerSetter", 1, js_imgui_pointer, POINTER_SET),
     JS_CFUNC_MAGIC_DEF("PointerGetSet", 1, js_imgui_pointer, POINTER_GETSET),
 };
-
 
 template<size_t N>
 static inline JSValue

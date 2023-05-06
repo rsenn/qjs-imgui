@@ -5,6 +5,8 @@
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui/backends/imgui_impl_glfw.h"
 
+static bool glfw_initialized = false;
+
 static const char*
 get_glsl_version(void) {
   // Decide GL+GLSL versions
@@ -31,7 +33,6 @@ get_glsl_version(void) {
 #endif
   return glsl_version;
 }
-
 
 namespace ImGui {
 class Exception : public std::exception {
@@ -75,8 +76,21 @@ public:
 };
 } // namespace ImGui
 
+static std::string
+imgui_impl_type(const std::string& str) {
+  std::string::size_type pos, pos2;
+
+  pos = str.find("Impl");
+  const auto start = str.begin() + (pos == std::string::npos ? 0 : pos + 4);
+
+  pos2 = str.find_first_of("0123456789");
+  const auto end = pos2 == std::string::npos ? str.end() : str.begin() + pos2;
+
+  return std::string(start, end);
+}
 
 enum {
+  IMPL_GLFW_CREATE_WINDOW,
   IMPL_GLFW_INIT_FOR_OPEN_GL,
   IMPL_GLFW_INIT_FOR_VULKAN,
   IMPL_GLFW_INIT_FOR_OTHER,
@@ -97,7 +111,13 @@ js_imgui_impl_glfw_functions(JSContext* ctx, JSValueConst this_val, int argc, JS
   GLFWwindow* window = 0;
   GLFWmonitor* monitor = 0;
 
+  if(!glfw_initialized) {
+    glfwInit();
+    glfw_initialized = true;
+  }
+
   switch(magic) {
+    case IMPL_GLFW_CREATE_WINDOW:
     case IMPL_GLFW_NEW_FRAME:
     case IMPL_GLFW_SHUTDOWN: break;
     case IMPL_GLFW_MONITOR_CALLBACK: {
@@ -106,7 +126,18 @@ js_imgui_impl_glfw_functions(JSContext* ctx, JSValueConst this_val, int argc, JS
       break;
     }
     default: {
-      window = js_imgui_getobj<GLFWwindow>(ctx, argv[0]);
+      if(!(window = js_imgui_getobj<GLFWwindow>(ctx, argv[0]))) {
+        if((magic >= IMPL_GLFW_INIT_FOR_OPEN_GL && magic <= IMPL_GLFW_INIT_FOR_OTHER)) {
+          if(JS_IsArray(ctx, argv[0])) {
+            ImVec2 vec = js_imgui_getimvec2(ctx, argv[0]);
+            const char* str = argc > 1 ? JS_ToCString(ctx, argv[1]) : 0;
+
+            get_glsl_version();
+
+            window = glfwCreateWindow(vec.x, vec.y, str ? str : "ImGui_ImplGlfw", 0, 0);
+          }
+        }
+      }
       assert(window);
       break;
     }
@@ -114,16 +145,32 @@ js_imgui_impl_glfw_functions(JSContext* ctx, JSValueConst this_val, int argc, JS
 
   try {
     switch(magic) {
+      case IMPL_GLFW_CREATE_WINDOW: {
+        uint32_t w, h;
+        const char* str = 0;
+        JS_ToUint32(ctx, &w, argv[0]);
+        JS_ToUint32(ctx, &h, argv[1]);
+        if(argc > 2)
+          str = JS_ToCString(ctx, argv[2]);
+
+        get_glsl_version();
+
+        window = glfwCreateWindow(w, h, str ? str : "ImGui_ImplGlfw", 0, 0);
+
+        ret = js_imgui_newptr(ctx, window);
+
+        break;
+      }
       case IMPL_GLFW_INIT_FOR_OPEN_GL: {
-        ImGui_ImplGlfw_InitForOpenGL(window, JS_ToBool(ctx, argv[1]));
+        ImGui_ImplGlfw_InitForOpenGL(window, argc > 1 ? JS_ToBool(ctx, argv[1]) : true);
         break;
       }
       case IMPL_GLFW_INIT_FOR_VULKAN: {
-        ImGui_ImplGlfw_InitForVulkan(window, JS_ToBool(ctx, argv[1]));
+        ImGui_ImplGlfw_InitForVulkan(window, argc > 1 ? JS_ToBool(ctx, argv[1]) : true);
         break;
       }
       case IMPL_GLFW_INIT_FOR_OTHER: {
-        ImGui_ImplGlfw_InitForOther(window, JS_ToBool(ctx, argv[1]));
+        ImGui_ImplGlfw_InitForOther(window, argc > 1 ? JS_ToBool(ctx, argv[1]) : true);
         break;
       }
       case IMPL_GLFW_SHUTDOWN: {
@@ -193,6 +240,7 @@ js_imgui_impl_glfw_functions(JSContext* ctx, JSValueConst this_val, int argc, JS
 }
 
 static const JSCFunctionListEntry js_imgui_impl_glfw[] = {
+    JS_CFUNC_MAGIC_DEF("CreateWindow", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_CREATE_WINDOW),
     JS_CFUNC_MAGIC_DEF("InitForOpenGL", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_INIT_FOR_OPEN_GL),
     JS_CFUNC_MAGIC_DEF("InitForVulkan", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_INIT_FOR_VULKAN),
     JS_CFUNC_MAGIC_DEF("InitForOther", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_INIT_FOR_OTHER),
@@ -265,7 +313,8 @@ js_imgui_impl_opengl3_call(JSContext* ctx, JSValueConst this_val, int argc, JSVa
             glsl_version = JS_ToCString(ctx, argv[i]);
         }
 
-        ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_Init(glsl_version));
+        ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_Init(glsl_version ? glsl_version : get_glsl_version()));
+
         if(glsl_version)
           JS_FreeCString(ctx, glsl_version);
         break;
