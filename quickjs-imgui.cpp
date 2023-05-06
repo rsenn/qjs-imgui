@@ -36,9 +36,9 @@ static std::vector<JSValue> imgui_implementations;
 static std::vector<JSAtom> impl_init_methods = {};
 
 static bool imgui_is_initialized;
-static const char* glsl_version = 0;
+// static const char* glsl_version = 0;
 
-static void
+/*static void
 js_imgui_init_gl(GLFWwindow* window) {
   if(!imgui_is_initialized) {
     glfwMakeContextCurrent(window);
@@ -59,12 +59,11 @@ js_imgui_init_gl(GLFWwindow* window) {
     glewInit();
 #endif
 
-    // ImGui_ImplOpenGL2_Init();
     ImGui_ImplOpenGL3_Init(glsl_version);
   }
 
   imgui_is_initialized = true;
-}
+}*/
 
 static void
 js_imgui_free_func(JSRuntime* rt, void* opaque, void* ptr) {
@@ -636,6 +635,8 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         ImFontAtlas* atlas = 0;
         ImGuiContext* imctx = 0;
 
+        IMGUI_CHECKVERSION();
+
         if(argc > 0 && (atlas = js_imfontatlas_data(argv[0]))) {
           --argc;
           ++argv;
@@ -646,6 +647,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
             JSValue ret, func = js_get_property(ctx, impl, impl_init_methods);
 
             ret = JS_Call(ctx, func, impl, argc, argv);
+            std::string fname = js_tostring(ctx, js_get_property(ctx, func, "name"));
             JS_FreeValue(ctx, func);
 
             if(JS_IsException(ret))
@@ -657,7 +659,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
               break;
             }
 
-            std::cout << js_get_tostringtag(ctx, impl) << " returned " << js_tostring(ctx, ret) << std::endl;
+            std::cout << js_get_tostringtag(ctx, impl) << "." << fname << "() returned " << js_tostring(ctx, ret) << std::endl;
 
             JS_FreeValue(ctx, ret);
           }
@@ -695,7 +697,23 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       }
       case IMGUI_NEW_FRAME: {
 
-        js_invoke_all(ctx, imgui_implementations, "NewFrame");
+        // js_invoke_all(ctx, imgui_implementations, "NewFrame");
+
+        const auto& it = std::find_if(imgui_implementations.begin(), imgui_implementations.end(), std::bind(js_has_property<std::string>, ctx, std::placeholders::_1, "RenderDrawData"));
+
+        if(it == imgui_implementations.end()) {
+          ret = JS_ThrowInternalError(ctx, "supply an implementation that has .RenderDrawData() to ImGui::Init()");
+          break;
+        }
+        std::cout << "Render Impl: " << js_get_tostringtag(ctx, *it) << std::endl;
+        js_invoke(ctx, *it, "NewFrame");
+
+        for(auto it2 = imgui_implementations.begin(); it2 != imgui_implementations.end(); ++it2) {
+          if(it2 == it)
+            continue;
+          std::cout << "Other Impl: " << js_get_tostringtag(ctx, *it2) << std::endl;
+          js_invoke(ctx, *it2, "NewFrame");
+        }
 
         ImGui::NewFrame();
         break;
@@ -3177,8 +3195,6 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   return 0;
 }
 
-extern "C" const char* get_glsl_version(void);
-
 VISIBLE JSModuleDef*
 js_init_module(JSContext* ctx, const char* module_name) {
   JSModuleDef* m;
@@ -3186,7 +3202,7 @@ js_init_module(JSContext* ctx, const char* module_name) {
   if(!(m = JS_NewCModule(ctx, module_name, &js_imgui_init)))
     return m;
 
-  glsl_version = get_glsl_version();
+  //  glsl_version = get_glsl_version();
 
   JS_AddModuleExport(ctx, m, "ImGuiIO");
   JS_AddModuleExport(ctx, m, "ImGuiStyle");

@@ -3,6 +3,33 @@
 
 #include "quickjs-imdrawdata.hpp"
 
+static const char*
+get_glsl_version(void) {
+  // Decide GL+GLSL versions
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+  // GL ES 2.0 + GLSL 100
+  const char* glsl_version = "#version 100";
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+#elif defined(__APPLE__)
+  // GL 3.2 + GLSL 150
+  const char* glsl_version = "#version 150";
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // 3.2+ only
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);           // Required on Mac
+#else
+  // GL 3.0 + GLSL 130
+  const char* glsl_version = "#version 130";
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+  // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+  // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
+#endif
+  return glsl_version;
+}
+
 enum {
   IMPL_GLFW_INIT_FOR_OPEN_GL,
   IMPL_GLFW_INIT_FOR_VULKAN,
@@ -132,7 +159,7 @@ static const JSCFunctionListEntry js_imgui_impl_glfw[] = {
     JS_CFUNC_MAGIC_DEF("KeyCallback", 5, js_imgui_impl_glfw_functions, IMPL_GLFW_KEY_CALLBACK),
     JS_CFUNC_MAGIC_DEF("CharCallback", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_CHAR_CALLBACK),
     JS_CFUNC_MAGIC_DEF("MonitorCallback", 2, js_imgui_impl_glfw_functions, IMPL_GLFW_MONITOR_CALLBACK),
-    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui::ImplGlfw", JS_PROP_CONFIGURABLE),
+    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui.ImplGlfw", JS_PROP_CONFIGURABLE),
 };
 
 enum {
@@ -175,7 +202,7 @@ static const JSCFunctionListEntry js_imgui_impl_opengl2[] = {
     JS_CFUNC_MAGIC_DEF("DestroyFontsTexture", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_DESTROY_FONTS_TEXTURE),
     JS_CFUNC_MAGIC_DEF("CreateDeviceObjects", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_CREATE_DEVICE_OBJECTS),
     JS_CFUNC_MAGIC_DEF("DestroyDeviceObjects", 0, js_imgui_impl_opengl2_call, IMPL_OPENGL_DESTROY_DEVICE_OBJECTS),
-    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui::ImplOpenGL2", JS_PROP_CONFIGURABLE),
+    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui.ImplOpenGL2", JS_PROP_CONFIGURABLE),
 };
 
 static JSValue
@@ -186,8 +213,11 @@ js_imgui_impl_opengl3_call(JSContext* ctx, JSValueConst this_val, int argc, JSVa
     switch(magic) {
       case IMPL_OPENGL_INIT: {
         const char* glsl_version = 0;
-        if(argc > 0)
-          glsl_version = JS_ToCString(ctx, argv[0]);
+
+        for(int i = 0; i < argc; ++i) {
+          if(JS_IsString(argv[i]))
+            glsl_version = JS_ToCString(ctx, argv[i]);
+        }
 
         ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_Init(glsl_version));
         if(glsl_version)
@@ -216,7 +246,7 @@ static const JSCFunctionListEntry js_imgui_impl_opengl3[] = {
     JS_CFUNC_MAGIC_DEF("DestroyFontsTexture", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_DESTROY_FONTS_TEXTURE),
     JS_CFUNC_MAGIC_DEF("CreateDeviceObjects", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_CREATE_DEVICE_OBJECTS),
     JS_CFUNC_MAGIC_DEF("DestroyDeviceObjects", 0, js_imgui_impl_opengl3_call, IMPL_OPENGL_DESTROY_DEVICE_OBJECTS),
-    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui::ImplOpenGL3", JS_PROP_CONFIGURABLE),
+    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui.ImplOpenGL3", JS_PROP_CONFIGURABLE),
 };
 
 #endif // defined(QUICKJS_IMGUI_IMPLEMENTATION_HPP)

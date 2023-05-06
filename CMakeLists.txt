@@ -101,8 +101,10 @@ option(IMGUI_DEMO "Build IMGUI demo" OFF)
 
 if(IMGUI_DEMO)
   add_executable(imgui_demo imgui/examples/example_glfw_opengl3/main.cpp
-                            imgui/imgui_demo.cpp ${IMGUI_SOURCES})
-  target_link_libraries(imgui_demo ${imgui_LIBRARIES} ${imgui_DEPS} dl)
+                            imgui/imgui_demo.cpp  ${IMGUI_SOURCES}
+                            imgui/backends/imgui_impl_glfw.cpp
+                            imgui/backends/imgui_impl_opengl3.cpp)
+  target_link_libraries(imgui_demo ${imgui_LIBRARIES} ${imgui_DEPS} pthread dl)
 endif(IMGUI_DEMO)
 
 

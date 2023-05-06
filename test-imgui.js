@@ -1,4 +1,4 @@
-import * as glfw from 'glfw';
+import { context, CONTEXT_VERSION_MAJOR, CONTEXT_VERSION_MINOR, OPENGL_CORE_PROFILE, OPENGL_FORWARD_COMPAT, OPENGL_PROFILE, poll, RESIZABLE, SAMPLES, Window } from 'glfw';
 import * as nvg from 'nanovg';
 import * as ImGui from 'imgui';
 
@@ -167,41 +167,40 @@ let combo_value = ImGui.Pointer(
 
 function main() {
   for(let [prop, value] of [
-    [glfw.CONTEXT_VERSION_MAJOR, 3],
-    [glfw.CONTEXT_VERSION_MINOR, 2],
-    [glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE],
-    [glfw.OPENGL_FORWARD_COMPAT, true],
-    [glfw.RESIZABLE, true],
-    [glfw.SAMPLES, 4]
+    [CONTEXT_VERSION_MAJOR, 3],
+    [CONTEXT_VERSION_MINOR, 2],
+    [OPENGL_PROFILE, OPENGL_CORE_PROFILE],
+    [OPENGL_FORWARD_COMPAT, true],
+    [RESIZABLE, true],
+    [SAMPLES, 4]
   ])
-    glfw.Window.hint(prop, value);
+    Window.hint(prop, value);
 
-  window = glfw.context.current= new glfw.Window(800, 600, 'ImGui test');
+  window = context.current = new Window(800, 600, 'ImGui test');
   //window ??= [1280,800];
 
-  nvg.CreateGL3(nvg.STENCIL_STROKES | nvg.ANTIALIAS | nvg.DEBUG);
+  let ok = nvg.CreateGL3(nvg.STENCIL_STROKES | nvg.ANTIALIAS | nvg.DEBUG);
+  console.log('nvg.CreateGL3() =', ok);
 
   ImGui.Init(ImGui.ImplGlfw, ImGui.ImplOpenGL3);
   ImGui.CreateContext(window);
+  ImGui.StyleColorsDark();
 
   // import('nanovg').then(m => ((nvg = m), nvg.CreateGL3(nvg.STENCIL_STROKES | nvg.ANTIALIAS | nvg.DEBUG)));
 
   console.log('ImGui.WindowFlags.MenuBar', ImGui.WindowFlags.MenuBar);
 
   while(!window.shouldClose && running) {
-    glfw.poll();
-
-    if(nvg) {
-      Clear(nvg.RGB(...(show_light_bg() ? [0xdd, 0xdd, 0xdd] : [0, 0, 0])));
-      nvg.BeginFrame(...window.size, 1);
-      nvg.EndFrame();
-    }
+    poll();
 
     ImGui.NewFrame();
 
     ImGui.Begin('This is a window', null, ImGui.WindowFlags.MenuBar);
 
-    ImGui.SetWindowSize([400, 300]);
+    ImGui.SetWindowSize([...window.size]);
+
+    console.log('ImGui.GetContentRegionAvail() =', ImGui.GetContentRegionAvail());
+
     ImGui.PushItemWidth(ImGui.GetFontSize() * -12);
 
     ImGui.Text('This is some Text');
@@ -241,17 +240,8 @@ function main() {
     ImGui.InputScalar('input float', ImGui.DataType.Float, f32_v, 1, 10);
     ImGui.InputScalar('input double', ImGui.DataType.Double, f64_v, 1, 10);
 
-    ImGui.InputTextMultiline(
-      'Text',
-      text_buf2,
-      text_buf2.byteLength,
-      [100, 30],
-      ImGui.InputTextFlags.CallbackAlways,
-      data => console.log('InputTextMultiline event', data)
-    );
-    ImGui.InputFloat('Float', float_value, 1, 10, null, ImGui.InputTextFlags.CallbackAlways, data =>
-      console.log('InputFloat event', data)
-    );
+    ImGui.InputTextMultiline('Text', text_buf2, text_buf2.byteLength, [100, 30], ImGui.InputTextFlags.CallbackAlways, data => console.log('InputTextMultiline event', data));
+    ImGui.InputFloat('Float', float_value, 1, 10, null, ImGui.InputTextFlags.CallbackAlways, data => console.log('InputFloat event', data));
     false &&
       ImGui.InputText('Text', text_buf, text_buf.byteLength, ImGui.InputTextFlags.CallbackAlways, data => {
         /* prettier-ignore */ const {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection } = data;
@@ -273,11 +263,7 @@ function main() {
         ImGui.EndMenu();
       }
       if(ImGui.BeginMenu('Examples')) {
-        ImGui.MenuItem(
-          'Main menu bar',
-          null,
-          ptr ?? (v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v)))
-        );
+        ImGui.MenuItem('Main menu bar', null, ptr ?? (v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v))));
 
         //console.log('show_app_main_menu_bar', show_app_main_menu_bar);
 
@@ -285,39 +271,21 @@ function main() {
         ImGui.MenuItem('Console', null, v => (v === undefined ? show_app_console : (show_app_console = v)));
         ImGui.MenuItem('Log', null, v => (v === undefined ? show_app_log : (show_app_log = v)));
         ImGui.MenuItem('Simple layout', null, v => (v === undefined ? show_app_layout : (show_app_layout = v)));
-        ImGui.MenuItem('Property editor', null, v =>
-          v === undefined ? show_app_property_editor : (show_app_property_editor = v)
-        );
-        ImGui.MenuItem('Long text display', null, v =>
-          v === undefined ? show_app_long_text : (show_app_long_text = v)
-        );
-        ImGui.MenuItem('Auto-resizing window', null, v =>
-          v === undefined ? show_app_auto_resize : (show_app_auto_resize = v)
-        );
-        ImGui.MenuItem('Constrained-resizing window', null, v =>
-          v === undefined ? show_app_constrained_resize : (show_app_constrained_resize = v)
-        );
-        ImGui.MenuItem('Simple overlay', null, v =>
-          v === undefined ? show_app_simple_overlay : (show_app_simple_overlay = v)
-        );
-        ImGui.MenuItem('Fullscreen window', null, v =>
-          v === undefined ? show_app_fullscreen : (show_app_fullscreen = v)
-        );
-        ImGui.MenuItem('Manipulating window titles', null, v =>
-          v === undefined ? show_app_window_titles : (show_app_window_titles = v)
-        );
-        ImGui.MenuItem('Custom rendering', null, v =>
-          v === undefined ? show_app_custom_rendering : (show_app_custom_rendering = v)
-        );
+        ImGui.MenuItem('Property editor', null, v => (v === undefined ? show_app_property_editor : (show_app_property_editor = v)));
+        ImGui.MenuItem('Long text display', null, v => (v === undefined ? show_app_long_text : (show_app_long_text = v)));
+        ImGui.MenuItem('Auto-resizing window', null, v => (v === undefined ? show_app_auto_resize : (show_app_auto_resize = v)));
+        ImGui.MenuItem('Constrained-resizing window', null, v => (v === undefined ? show_app_constrained_resize : (show_app_constrained_resize = v)));
+        ImGui.MenuItem('Simple overlay', null, v => (v === undefined ? show_app_simple_overlay : (show_app_simple_overlay = v)));
+        ImGui.MenuItem('Fullscreen window', null, v => (v === undefined ? show_app_fullscreen : (show_app_fullscreen = v)));
+        ImGui.MenuItem('Manipulating window titles', null, v => (v === undefined ? show_app_window_titles : (show_app_window_titles = v)));
+        ImGui.MenuItem('Custom rendering', null, v => (v === undefined ? show_app_custom_rendering : (show_app_custom_rendering = v)));
         ImGui.MenuItem('Documents', null, v => (v === undefined ? show_app_documents : (show_app_documents = v)));
         ImGui.EndMenu();
       }
       //if (ImGui.MenuItem("MenuItem")) {} // You can also use MenuItem() inside a menu bar!
       if(ImGui.BeginMenu('Tools')) {
         ImGui.MenuItem('Metrics/Debugger', null, v => (v === undefined ? show_app_metrics : (show_app_metrics = v)));
-        ImGui.MenuItem('Style Editor', null, v =>
-          v === undefined ? show_app_style_editor : (show_app_style_editor = v)
-        );
+        ImGui.MenuItem('Style Editor', null, v => (v === undefined ? show_app_style_editor : (show_app_style_editor = v)));
         ImGui.MenuItem('About Dear ImGui', null, v => (v === undefined ? show_app_about : (show_app_about = v)));
         ImGui.EndMenu();
       }
@@ -328,10 +296,47 @@ function main() {
 
     ImGui.Render();
 
-    let data = ImGui.GetDrawData();
-    //console.log('data',data);
+    if(ok) {
+      nvg.BeginFrame(...window.size, 1);
+      Clear(nvg.RGB(...(show_light_bg() ? [0x66, 0x88, 0xff] : [0, 0, 0])));
 
+      nvg.BeginPath();
+
+      nvg.Translate(window.size.width / 2, window.size.height / 2);
+      nvg.Scale(2, 2);
+      nvg.Translate(-50, -50);
+
+      nvg.MoveTo(50, 0);
+      nvg.LineTo(100, 50);
+      nvg.LineTo(50, 100);
+      nvg.LineTo(0, 50);
+      nvg.ClosePath();
+
+      nvg.StrokeColor(nvg.RGB(255, 0, 0));
+      nvg.StrokeWidth(2);
+      nvg.Stroke();
+
+      nvg.EndFrame();
+    }
+
+    nvg.BeginFrame(...window.size, 1);
+
+    let data = ImGui.GetDrawData();
     ImGui.RenderDrawData(data);
+
+    nvg.EndFrame();
+
+    let { id, Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale } = data;
+    console.log('data', id, {
+      Valid,
+      CmdListsCount,
+      TotalIdxCount,
+      TotalVtxCount,
+      DisplayPos,
+      DisplaySize,
+      FramebufferScale
+    });
+
     window.swapBuffers();
   }
 }
@@ -344,4 +349,5 @@ const runMain = () => {
     console.log('ERROR:', error);
   }
 };
+
 import('console') .catch(runMain) .then(({ Console }) => ((globalThis.console = new Console({ inspectOptions: {} })), runMain()));
