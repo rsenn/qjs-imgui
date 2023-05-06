@@ -9,7 +9,6 @@
 #include <vector>
 #include <algorithm>
 #include <functional>
-#include <ranges>
 
 struct imgui;
 
@@ -702,8 +701,7 @@ set_scalar<ImGuiDataType_Double>(union ImGuiDataTypeUnion& data, ScalarType<ImGu
   data.f64 = value;
 }
 
-template<enum ImGuiDataType_ type> typename ScalarType<type>::value_type 
-get_scalar(union ImGuiDataTypeUnion const& data);
+template<enum ImGuiDataType_ type> typename ScalarType<type>::value_type get_scalar(union ImGuiDataTypeUnion const& data);
 
 template<>
 ScalarType<ImGuiDataType_S8>::value_type
