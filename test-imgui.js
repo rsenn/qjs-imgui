@@ -297,8 +297,7 @@ function main() {
       }
       ImGui.EndMenuBar();
     }
-    console.log('ImGui.GetContentRegionAvail() =', ImGui.GetContentRegionAvail());
-
+ 
     ImGui.End();
 
     ImGui.Render();
@@ -329,8 +328,8 @@ function main() {
     let data = ImGui.GetDrawData();
     ImGui.RenderDrawData(data);
 
-    let { id, Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale } = data;
-    console.log('data', id, { Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale });
+    /*let { id, Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale } = data;
+    console.log('data', id, { Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale });*/
 
     window.swapBuffers();
   }
