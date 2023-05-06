@@ -1494,7 +1494,26 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         break;
       }
       case IMGUI_SLIDER_ANGLE: break;
-      case IMGUI_SLIDER_INT: break;
+      case IMGUI_SLIDER_INT: {
+   const char* label = JS_ToCString(ctx, argv[0]);
+        OutputArg<int32_t> p_value(ctx, argv[1]);
+        int32_t vmin = 0, vmax = INT32_MAX;
+        const char* format = 0;
+        int32_t flags = 0;
+
+        JS_ToInt32(ctx, &vmin, argv[2]);
+        JS_ToInt32(ctx, &vmax, argv[3]);
+        if(argc > 4 && !(JS_IsUndefined(argv[4]) || JS_IsNull(argv[4])))
+          format = JS_ToCString(ctx, argv[4]);
+        if(argc > 5)
+          JS_ToInt32(ctx, &flags, argv[5]);
+
+        ret = JS_NewBool(ctx, ImGui::SliderFloat(label, p_value, vmin, vmax, format ? format : "%"PRId32, ImGuiSliderFlags(flags)));
+
+        if(format)
+          JS_FreeCString(ctx, format);
+      break;
+    }
       case IMGUI_SLIDER_INT2: break;
       case IMGUI_SLIDER_INT3: break;
       case IMGUI_SLIDER_INT4: break;
