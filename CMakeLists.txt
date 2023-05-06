@@ -34,7 +34,7 @@ endif(USE_GLEW)
 if(BUILD_GLFW)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildGLFW.cmake)
 
-  build_glfw(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+  build_glfw(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
   add_definitions(
     -DHAVE_GLFW_GET_ERROR
