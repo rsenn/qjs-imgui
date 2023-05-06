@@ -12,7 +12,6 @@
 #include <cctype>
 #include <GLFW/glfw3.h>
 
-#include "quickjs-imconfig.hpp"
 #include "quickjs-imgui.hpp"
 #include "quickjs-imgui-constants.hpp"
 #include "quickjs-imgui-payload.hpp"
@@ -22,10 +21,7 @@
 #include "quickjs-imfontatlas.hpp"
 #include "quickjs-imdrawdata.hpp"
 #include "quickjs-imgui-inputtextcallbackdata.hpp"
-
-#include "imgui/backends/imgui_impl_opengl2.h"
-#include "imgui/backends/imgui_impl_opengl3.h"
-#include "imgui/backends/imgui_impl_glfw.h"
+#include "quickjs-imgui-implementation.hpp"
 
 static JSClassDef js_imgui_impl_class = {
     .class_name = "ImGuiImpl",
@@ -705,13 +701,13 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
           ret = JS_ThrowInternalError(ctx, "supply an implementation that has .RenderDrawData() to ImGui::Init()");
           break;
         }
-        std::cout << "Render Impl: " << js_get_tostringtag(ctx, *it) << std::endl;
+        //std::cout << "Render Impl: " << js_get_tostringtag(ctx, *it) << std::endl;
         js_invoke(ctx, *it, "NewFrame");
 
         for(auto it2 = imgui_implementations.begin(); it2 != imgui_implementations.end(); ++it2) {
           if(it2 == it)
             continue;
-          std::cout << "Other Impl: " << js_get_tostringtag(ctx, *it2) << std::endl;
+          //std::cout << "Other Impl: " << js_get_tostringtag(ctx, *it2) << std::endl;
           js_invoke(ctx, *it2, "NewFrame");
         }
 
@@ -3086,8 +3082,6 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_CFUNC_MAGIC_DEF("PointerGetSet", 1, js_imgui_pointer, POINTER_GETSET),
 };
 
-#include "quickjs-imgui-inputtextcallbackdata.hpp"
-#include "quickjs-imgui-implementation.hpp"
 
 template<size_t N>
 static inline JSValue

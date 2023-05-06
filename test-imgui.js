@@ -177,6 +177,16 @@ function main() {
     Window.hint(prop, value);
 
   window = context.current = new Window(800, 600, 'ImGui test');
+
+  window.handleChar = c => {
+    let s = String.fromCharCode(c);
+    if(s == 'q') {
+      running = false;
+    } else {
+      console.log('handleChar', { c, s });
+    }
+  };
+
   //window ??= [1280,800];
 
   let ok = nvg.CreateGL3(nvg.STENCIL_STROKES | nvg.ANTIALIAS | nvg.DEBUG);
@@ -199,7 +209,7 @@ function main() {
 
     ImGui.SetWindowSize([...window.size]);
 
-    console.log('ImGui.GetContentRegionAvail() =', ImGui.GetContentRegionAvail());
+    //console.log('ImGui.GetContentRegionAvail() =', ImGui.GetContentRegionAvail());
 
     ImGui.PushItemWidth(ImGui.GetFontSize() * -12);
 
@@ -303,7 +313,7 @@ function main() {
       nvg.BeginPath();
 
       nvg.Translate(window.size.width / 2, window.size.height / 2);
-      nvg.Scale(2, 2);
+      nvg.Scale(3, 3);
       nvg.Translate(-50, -50);
 
       nvg.MoveTo(50, 0);
@@ -312,7 +322,7 @@ function main() {
       nvg.LineTo(0, 50);
       nvg.ClosePath();
 
-      nvg.StrokeColor(nvg.RGB(255, 0, 0));
+      nvg.StrokeColor(nvg.RGB(255, 255, 40));
       nvg.StrokeWidth(2);
       nvg.Stroke();
 
@@ -327,15 +337,7 @@ function main() {
     nvg.EndFrame();
 
     let { id, Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale } = data;
-    console.log('data', id, {
-      Valid,
-      CmdListsCount,
-      TotalIdxCount,
-      TotalVtxCount,
-      DisplayPos,
-      DisplaySize,
-      FramebufferScale
-    });
+    //console.log('data', id, {Valid, CmdListsCount, TotalIdxCount, TotalVtxCount, DisplayPos, DisplaySize, FramebufferScale });
 
     window.swapBuffers();
   }

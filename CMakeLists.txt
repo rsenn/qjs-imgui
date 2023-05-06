@@ -56,7 +56,6 @@ if(USE_GL3W)
   add_definitions(-DUSE_GL3W)
 endif(USE_GL3W)
 
-
 if(NOT USE_GLEW AND NOT USE_GL3W)
   add_definitions(-DIMGUI_IMPL_OPENGL_ES2)
 endif(NOT USE_GLEW AND NOT USE_GL3W)
@@ -85,7 +84,7 @@ if(USE_GL3W)
   endif(NOT TARGET gl3w_gen)
 endif(USE_GL3W)
 
-set(imgui_LIBRARIES ${GLFW_LIBRARY}  ${OPENGL_gl_LIBRARY})
+set(imgui_LIBRARIES ${GLFW_LIBRARY} ${OPENGL_gl_LIBRARY})
 #set(imgui_DEPS gl3w)
 
 set(IMGUI_SOURCES imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp
@@ -100,22 +99,21 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends)
 option(IMGUI_DEMO "Build IMGUI demo" OFF)
 
 if(IMGUI_DEMO)
-  add_executable(imgui_demo imgui/examples/example_glfw_opengl3/main.cpp
-                            imgui/imgui_demo.cpp  ${IMGUI_SOURCES}
-                            imgui/backends/imgui_impl_glfw.cpp
-                            imgui/backends/imgui_impl_opengl3.cpp)
+  add_executable(
+    imgui_demo
+    imgui/examples/example_glfw_opengl3/main.cpp imgui/imgui_demo.cpp
+    ${IMGUI_SOURCES} imgui/backends/imgui_impl_glfw.cpp
+    imgui/backends/imgui_impl_opengl3.cpp)
   target_link_libraries(imgui_demo ${imgui_LIBRARIES} ${imgui_DEPS} pthread dl)
 endif(IMGUI_DEMO)
 
-
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-add_definitions(-DIMGUI_USER_CONFIG=\"quickjs-imconfig.hpp\")
-
+#add_definitions(-DIMGUI_USER_CONFIG=\"quickjs-imconfig.hpp\")
 
 make_module(
   imgui
   quickjs-imgui.cpp
-  quickjs-imgui-implementation.cpp
+  #quickjs-imgui-implementation.cpp
   quickjs-imfontatlas.hpp
   quickjs-imfont.hpp
   quickjs-imgui-constants.hpp
@@ -125,4 +123,7 @@ make_module(
   quickjs-imgui-payload.hpp
   quickjs-imgui-pointer.hpp
   quickjs-imgui-style.hpp
-  ${IMGUI_SOURCES})
+  ${IMGUI_SOURCES}
+  imgui/backends/imgui_impl_glfw.cpp
+  imgui/backends/imgui_impl_opengl2.cpp
+  imgui/backends/imgui_impl_opengl3.cpp)

@@ -1,7 +1,9 @@
 #ifndef QUICKJS_IMGUI_IMPLEMENTATION_HPP
 #define QUICKJS_IMGUI_IMPLEMENTATION_HPP
 
-#include "quickjs-imdrawdata.hpp"
+#include "imgui/backends/imgui_impl_opengl2.h"
+#include "imgui/backends/imgui_impl_opengl3.h"
+#include "imgui/backends/imgui_impl_glfw.h"
 
 static const char*
 get_glsl_version(void) {
@@ -29,6 +31,50 @@ get_glsl_version(void) {
 #endif
   return glsl_version;
 }
+
+
+namespace ImGui {
+class Exception : public std::exception {
+  const char* file;
+  int line;
+  const char *expr, *func;
+  std::string msg;
+
+public:
+  Exception(const char* expr_, const char* file_, int line_, const char* func_) : std::exception(), expr(expr_), file(file_), line(line_), func(func_) {
+    const char* s;
+
+    if((s = strstr(expr, " && \"")))
+      msg = std::string(s + 5, strlen(s + 5) - 1);
+    else
+      msg = expr;
+  }
+
+  const char*
+  get_file() const {
+    return file;
+  }
+  int
+  get_line() const {
+    return line;
+  }
+  const char*
+  get_func() const {
+    return func;
+  }
+
+  const char*
+  what() const throw() {
+    return msg.c_str();
+  }
+
+  JSValue
+  throw_js(JSContext* ctx) const noexcept {
+    return JS_ThrowInternalError(ctx, "ImGui::Exception [%s] in %s() at %s:%d", what(), get_func(), get_file(), get_line());
+  }
+};
+} // namespace ImGui
+
 
 enum {
   IMPL_GLFW_INIT_FOR_OPEN_GL,
