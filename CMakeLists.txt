@@ -113,7 +113,7 @@ add_definitions(-DIMGUI_USER_CONFIG=\"quickjs-imconfig.hpp\")
 make_module(
   imgui
   quickjs-imgui.cpp
-  quickjs-imgui-impl.cpp
+  quickjs-imgui-implementation.cpp
   quickjs-imfontatlas.hpp
   quickjs-imfont.hpp
   quickjs-imgui-constants.hpp

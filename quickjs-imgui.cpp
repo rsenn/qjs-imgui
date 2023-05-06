@@ -20,6 +20,7 @@
 #include "quickjs-imgui-pointer.hpp"
 #include "quickjs-imfont.hpp"
 #include "quickjs-imfontatlas.hpp"
+#include "quickjs-imdrawdata.hpp"
 #include "quickjs-imgui-inputtextcallbackdata.hpp"
 
 #include "imgui/backends/imgui_impl_opengl2.h"
@@ -130,39 +131,6 @@ js_imgui_getcolor(JSContext* ctx, JSValueConst value) {
   return vec;
 }
 
-static JSValue
-js_imgui_newptr(JSContext* ctx, void* ptr) {
-  char buf[128];
-  snprintf(buf, sizeof(buf), "%p", ptr);
-  return JS_NewString(ctx, buf);
-}
-
-template<class T>
-static T*
-js_imgui_getptr(JSContext* ctx, JSValueConst value) {
-  const char* str = JS_ToCString(ctx, value);
-  void* ptr = 0;
-  sscanf(str, "%p", &ptr);
-  JS_FreeCString(ctx, str);
-  return static_cast<T*>(ptr);
-}
-
-template<typename T>
-static T*
-js_imgui_getobj(JSContext* ctx, JSValueConst value) {
-  T* obj = 0;
-
-  if(JS_IsString(value)) {
-    obj = js_imgui_getptr<T>(ctx, value);
-  } else if(JS_IsObject(value)) {
-    JSValue id = JS_GetPropertyStr(ctx, value, "id");
-
-    obj = js_imgui_getobj<T>(ctx, id);
-    JS_FreeValue(ctx, id);
-  }
-  return obj;
-}
-
 static ImTextureID
 js_imgui_gettexture(JSContext* ctx, JSValueConst value) {
   if(JS_IsNumber(value)) {
@@ -172,24 +140,6 @@ js_imgui_gettexture(JSContext* ctx, JSValueConst value) {
   }
 
   return js_imgui_getptr<void>(ctx, value);
-}
-
-static JSValue
-js_imgui_newimvec2(JSContext* ctx, const ImVec2& vec) {
-  JSValue ret = JS_NewArray(ctx);
-  JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, vec.x));
-  JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, vec.y));
-  return ret;
-}
-
-static JSValue
-js_imgui_newimvec4(JSContext* ctx, const ImVec4& vec) {
-  JSValue ret = JS_NewArray(ctx);
-  JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, vec.x));
-  JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, vec.y));
-  JS_SetPropertyUint32(ctx, ret, 2, JS_NewFloat64(ctx, vec.z));
-  JS_SetPropertyUint32(ctx, ret, 3, JS_NewFloat64(ctx, vec.w));
-  return ret;
 }
 
 static int
@@ -653,18 +603,6 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
           imgui_implementations.push_back(obj);
 
           std::string class_name = js_get_tostringtag(ctx, obj);
-
-          /*    std::cout << "class: " << class_name << ' ';
-              std::cout << "this_val: " << js_tostring(ctx, js_get_property(ctx, this_val, "IMGUI_VERSION")) << ' ';
-              std::cout << "obj: " << js_tostring(ctx, obj) << ' ';
-              std::cout << "render: " << js_tostring(ctx, JS_GetProperty(ctx, obj, renderprop)) << std::endl;
-
-              if(JS_HasProperty(ctx, obj, renderprop)) {
-                JS_SetProperty(ctx, this_val, renderprop, JS_GetProperty(ctx, obj, renderprop));
-              }
-    */
-          // std::cout << "class_name: " << imgui_impl_type(class_name) << std::endl;
-
           impl_init_methods.push_back(js_atom(ctx, std::string("InitFor") + imgui_impl_type(class_name)));
         }
 
@@ -771,7 +709,8 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         break;
       }
       case IMGUI_GET_DRAW_DATA: {
-        ret = js_imgui_newptr(ctx, ImGui::GetDrawData());
+        // ret = js_imgui_newptr(ctx, ImGui::GetDrawData());
+        ret = js_imdrawdata_wrap(ctx, ImGui::GetDrawData());
         break;
       }
       case IMGUI_RENDER_DRAW_DATA: {
@@ -3130,7 +3069,7 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
 };
 
 #include "quickjs-imgui-inputtextcallbackdata.hpp"
-#include "quickjs-imgui-impl.hpp"
+#include "quickjs-imgui-implementation.hpp"
 
 template<size_t N>
 static inline JSValue
@@ -3200,6 +3139,15 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   JS_SetPropertyFunctionList(ctx, imfontatlas_proto, js_imfontatlas_funcs, countof(js_imfontatlas_funcs));
   JS_SetClassProto(ctx, js_imfontatlas_class_id, imfontatlas_proto);
 
+  JS_NewClassID(&js_imdrawdata_class_id);
+  JS_NewClass(JS_GetRuntime(ctx), js_imdrawdata_class_id, &js_imdrawdata_class);
+
+  imdrawdata_ctor = JS_NewCFunction2(ctx, js_imdrawdata_constructor, "ImDrawData", 1, JS_CFUNC_constructor, 0);
+  imdrawdata_proto = JS_NewObject(ctx);
+
+  JS_SetPropertyFunctionList(ctx, imdrawdata_proto, js_imdrawdata_funcs, countof(js_imdrawdata_funcs));
+  JS_SetClassProto(ctx, js_imdrawdata_class_id, imdrawdata_proto);
+
   JS_NewClassID(&js_imgui_pointer_class_id);
   JS_NewClass(JS_GetRuntime(ctx), js_imgui_pointer_class_id, &js_imgui_pointer_class);
 
@@ -3218,6 +3166,7 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
     JS_SetModuleExport(ctx, m, "ImGuiPayload", imgui_payload_ctor);
     JS_SetModuleExport(ctx, m, "ImFont", imfont_ctor);
     JS_SetModuleExport(ctx, m, "ImFontAtlas", imfontatlas_ctor);
+    JS_SetModuleExport(ctx, m, "ImDrawData", imdrawdata_ctor);
     JS_SetModuleExport(ctx, m, "ImplGlfw", js_imgui_impl_object<countof(js_imgui_impl_glfw)>(ctx, js_imgui_impl_glfw));
     JS_SetModuleExport(ctx, m, "ImplOpenGL2", js_imgui_impl_object<countof(js_imgui_impl_opengl2)>(ctx, js_imgui_impl_opengl2));
     JS_SetModuleExport(ctx, m, "ImplOpenGL3", js_imgui_impl_object<countof(js_imgui_impl_opengl3)>(ctx, js_imgui_impl_opengl3));
@@ -3245,6 +3194,7 @@ js_init_module(JSContext* ctx, const char* module_name) {
   JS_AddModuleExport(ctx, m, "ImGuiPayload");
   JS_AddModuleExport(ctx, m, "ImFont");
   JS_AddModuleExport(ctx, m, "ImFontAtlas");
+  JS_AddModuleExport(ctx, m, "ImDrawData");
   JS_AddModuleExport(ctx, m, "ImplGlfw");
   JS_AddModuleExport(ctx, m, "ImplOpenGL2");
   JS_AddModuleExport(ctx, m, "ImplOpenGL3");

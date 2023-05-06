@@ -122,7 +122,7 @@ js_imgui_inputtextcallbackdata_finalizer(JSRuntime* rt, JSValue val) {
   if(itcd) {
     delete itcd;
   }
-  JS_FreeValueRT(rt, val);
+  // JS_FreeValueRT(rt, val);
 }
 
 static JSValue

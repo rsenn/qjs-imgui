@@ -1,5 +1,7 @@
-#ifndef QUICKJS_IMGUI_IMPL_HPP
-#define QUICKJS_IMGUI_IMPL_HPP
+#ifndef QUICKJS_IMGUI_IMPLEMENTATION_HPP
+#define QUICKJS_IMGUI_IMPLEMENTATION_HPP
+
+#include "quickjs-imdrawdata.hpp"
 
 enum {
   IMPL_GLFW_INIT_FOR_OPEN_GL,
@@ -153,7 +155,7 @@ js_imgui_impl_opengl2_call(JSContext* ctx, JSValueConst this_val, int argc, JSVa
       case IMPL_OPENGL_INIT: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_Init()); break;
       case IMPL_OPENGL_SHUTDOWN: ImGui_ImplOpenGL2_Shutdown(); break;
       case IMPL_OPENGL_NEW_FRAME: ImGui_ImplOpenGL2_NewFrame(); break;
-      case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData()); break;
+      case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL2_RenderDrawData(argc > 0 ? js_imgui_getobj<ImDrawData>(ctx, argv[0]) : ImGui::GetDrawData()); break;
       case IMPL_OPENGL_CREATE_FONTS_TEXTURE: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_CreateFontsTexture()); break;
       case IMPL_OPENGL_DESTROY_FONTS_TEXTURE: ImGui_ImplOpenGL2_DestroyFontsTexture(); break;
       case IMPL_OPENGL_CREATE_DEVICE_OBJECTS: ret = JS_NewBool(ctx, ImGui_ImplOpenGL2_CreateDeviceObjects()); break;
@@ -194,7 +196,7 @@ js_imgui_impl_opengl3_call(JSContext* ctx, JSValueConst this_val, int argc, JSVa
       }
       case IMPL_OPENGL_SHUTDOWN: ImGui_ImplOpenGL3_Shutdown(); break;
       case IMPL_OPENGL_NEW_FRAME: ImGui_ImplOpenGL3_NewFrame(); break;
-      case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); break;
+      case IMPL_OPENGL_RENDER_DRAW_DATA: ImGui_ImplOpenGL3_RenderDrawData(argc > 0 ? js_imgui_getobj<ImDrawData>(ctx, argv[0]) : ImGui::GetDrawData()); break;
       case IMPL_OPENGL_CREATE_FONTS_TEXTURE: ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_CreateFontsTexture()); break;
       case IMPL_OPENGL_DESTROY_FONTS_TEXTURE: ImGui_ImplOpenGL3_DestroyFontsTexture(); break;
       case IMPL_OPENGL_CREATE_DEVICE_OBJECTS: ret = JS_NewBool(ctx, ImGui_ImplOpenGL3_CreateDeviceObjects()); break;
@@ -217,4 +219,4 @@ static const JSCFunctionListEntry js_imgui_impl_opengl3[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ImGui::ImplOpenGL3", JS_PROP_CONFIGURABLE),
 };
 
-#endif // defined(QUICKJS_IMGUI_IMPL_HPP)
+#endif // defined(QUICKJS_IMGUI_IMPLEMENTATION_HPP)

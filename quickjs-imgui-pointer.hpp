@@ -50,7 +50,7 @@ js_imgui_pointer_finalizer(JSRuntime* rt, JSValue val) {
       js_free_rt(rt, ptr);
     }
   }
-  JS_FreeValueRT(rt, val);
+  // JS_FreeValueRT(rt, val);
 }
 
 static JSValue

@@ -207,6 +207,57 @@ js_invoke_all(JSContext* ctx, const Vector& objs, const char* method, int argc =
   return ret;
 }
 
+static JSValue
+js_imgui_newptr(JSContext* ctx, void* ptr) {
+  char buf[128];
+  snprintf(buf, sizeof(buf), "%p", ptr);
+  return JS_NewString(ctx, buf);
+}
+
+template<class T>
+static T*
+js_imgui_getptr(JSContext* ctx, JSValueConst value) {
+  const char* str = JS_ToCString(ctx, value);
+  void* ptr = 0;
+  sscanf(str, "%p", &ptr);
+  JS_FreeCString(ctx, str);
+  return static_cast<T*>(ptr);
+}
+
+template<typename T>
+static T*
+js_imgui_getobj(JSContext* ctx, JSValueConst value) {
+  T* obj = 0;
+
+  if(JS_IsString(value)) {
+    obj = js_imgui_getptr<T>(ctx, value);
+  } else if(JS_IsObject(value)) {
+    JSValue id = JS_GetPropertyStr(ctx, value, "id");
+
+    obj = js_imgui_getobj<T>(ctx, id);
+    JS_FreeValue(ctx, id);
+  }
+  return obj;
+}
+
+static JSValue
+js_imgui_newimvec2(JSContext* ctx, const ImVec2& vec) {
+  JSValue ret = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, vec.x));
+  JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, vec.y));
+  return ret;
+}
+
+static JSValue
+js_imgui_newimvec4(JSContext* ctx, const ImVec4& vec) {
+  JSValue ret = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, ret, 0, JS_NewFloat64(ctx, vec.x));
+  JS_SetPropertyUint32(ctx, ret, 1, JS_NewFloat64(ctx, vec.y));
+  JS_SetPropertyUint32(ctx, ret, 2, JS_NewFloat64(ctx, vec.z));
+  JS_SetPropertyUint32(ctx, ret, 3, JS_NewFloat64(ctx, vec.w));
+  return ret;
+}
+
 template<typename T> struct JSVal {
   static T to(JSContext* ctx, JSValueConst jsval);
   static JSValue from(JSContext* ctx, T v);

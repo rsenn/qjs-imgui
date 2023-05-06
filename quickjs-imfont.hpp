@@ -57,7 +57,7 @@ js_imfont_finalizer(JSRuntime* rt, JSValue val) {
   if(payload) {
     delete payload;
   }
-  JS_FreeValueRT(rt, val);
+  // JS_FreeValueRT(rt, val);
 }
 
 static JSValue

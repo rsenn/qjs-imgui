@@ -90,7 +90,7 @@ js_imgui_style_finalizer(JSRuntime* rt, JSValue val) {
   if(style) {
     delete style;
   }
-  JS_FreeValueRT(rt, val);
+  /// JS_FreeValueRT(rt, val);
 }
 
 static JSValue
