@@ -172,7 +172,7 @@ js_imgui_pointer_call(JSContext* ctx, JSValueConst func_obj, JSValueConst this_v
 static JSClassDef js_imgui_pointer_class = {
     .class_name = "ImGuiPointer",
     .finalizer = js_imgui_pointer_finalizer,
-    .call = js_imgui_pointer_call,
+    .call = js_imgui_pointer_call
 };
 
 static const JSCFunctionListEntry js_imgui_pointer_funcs[] = {

@@ -16,7 +16,7 @@
 #include "quickjs-imgui-constants.hpp"
 #include "quickjs-imgui-payload.hpp"
 #include "quickjs-imgui-io.hpp"
-#include "quickjs-imgui-pointer.hpp"
+//#include "quickjs-imgui-pointer.hpp"
 #include "quickjs-imfont.hpp"
 #include "quickjs-imfontatlas.hpp"
 #include "quickjs-imdrawdata.hpp"
@@ -2987,10 +2987,10 @@ static const JSCFunctionListEntry js_imgui_static_funcs[] = {
     JS_OBJECT_DEF("MouseButton", js_imgui_mousebutton, countof(js_imgui_mousebutton), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("MouseCursor", js_imgui_mousecursor, countof(js_imgui_mousecursor), JS_PROP_ENUMERABLE),
     JS_OBJECT_DEF("Cond", js_imgui_cond, countof(js_imgui_cond), JS_PROP_ENUMERABLE),
-    JS_CFUNC_MAGIC_DEF("Pointer", 1, js_imgui_pointer, POINTER_CALL),
+    /*JS_CFUNC_MAGIC_DEF("Pointer", 1, js_imgui_pointer, POINTER_CALL),
     JS_CFUNC_MAGIC_DEF("PointerGetter", 1, js_imgui_pointer, POINTER_GET),
     JS_CFUNC_MAGIC_DEF("PointerSetter", 1, js_imgui_pointer, POINTER_SET),
-    JS_CFUNC_MAGIC_DEF("PointerGetSet", 1, js_imgui_pointer, POINTER_GETSET),
+    JS_CFUNC_MAGIC_DEF("PointerGetSet", 1, js_imgui_pointer, POINTER_GETSET),*/
 };
 
 template<size_t N>
@@ -3070,13 +3070,13 @@ js_imgui_init(JSContext* ctx, JSModuleDef* m) {
   JS_SetPropertyFunctionList(ctx, imdrawdata_proto, js_imdrawdata_funcs, countof(js_imdrawdata_funcs));
   JS_SetClassProto(ctx, js_imdrawdata_class_id, imdrawdata_proto);
 
-  JS_NewClassID(&js_imgui_pointer_class_id);
+  /*JS_NewClassID(&js_imgui_pointer_class_id);
   JS_NewClass(JS_GetRuntime(ctx), js_imgui_pointer_class_id, &js_imgui_pointer_class);
 
   imgui_pointer_proto = JS_NewObject(ctx);
 
   JS_SetPropertyFunctionList(ctx, imgui_pointer_proto, js_imgui_pointer_funcs, countof(js_imgui_pointer_funcs));
-  JS_SetClassProto(ctx, js_imgui_pointer_class_id, imgui_pointer_proto);
+  JS_SetClassProto(ctx, js_imgui_pointer_class_id, imgui_pointer_proto);*/
 
   JS_NewClassID(&js_imgui_impl_class_id);
   JS_NewClass(JS_GetRuntime(ctx), js_imgui_impl_class_id, &js_imgui_impl_class);
