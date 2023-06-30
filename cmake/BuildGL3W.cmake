@@ -41,7 +41,7 @@ macro(build_gl3w)
     endif()
 
     get_target_property(GL3W_LIBRARY_FILE gl3w-static IMPORTED_LOCATION)
-    # dump(GL3W_LIBRARY_FILE)
+     #dump(GL3W_LIBRARY_FILE)
 
     set(GL3W_INCLUDE_DIR "${BINARY_DIR}/include" CACHE PATH "libgl3w include directory" FORCE)
     set(GL3W_LIBRARY_DIR "${BINARY_DIR}" CACHE PATH "libgl3w library directory" FORCE)
