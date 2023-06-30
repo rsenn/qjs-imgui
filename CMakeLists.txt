@@ -36,16 +36,8 @@ if(BUILD_GLFW)
 
   build_glfw(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
-  add_definitions(
-    -DHAVE_GLFW_GET_ERROR
-    -DHAVE_GLFW_GET_MONITOR_CONTENT_SCALE
-    -DHAVE_GLFW_GET_MONITOR_WORKAREA
-    -DHAVE_GLFW_GET_WINDOW_OPACITY
-    -DHAVE_GLFW_REQUEST_WINDOW_ATTENTION
-    -DHAVE_GLFW_SET_WINDOW_CONTENT_SCALE_CALLBACK
-    -DHAVE_GLFW_SET_WINDOW_MAXIMIZE_CALLBACK
-    -DHAVE_GLFW_SET_WINDOW_OPACITY
-    -DHAVE_GLFW_WINDOW_HINT_STRING)
+  add_definitions(-DHAVE_GLFW_GET_ERROR -DHAVE_GLFW_GET_MONITOR_CONTENT_SCALE -DHAVE_GLFW_GET_MONITOR_WORKAREA -DHAVE_GLFW_GET_WINDOW_OPACITY -DHAVE_GLFW_REQUEST_WINDOW_ATTENTION
+                  -DHAVE_GLFW_SET_WINDOW_CONTENT_SCALE_CALLBACK -DHAVE_GLFW_SET_WINDOW_MAXIMIZE_CALLBACK -DHAVE_GLFW_SET_WINDOW_OPACITY -DHAVE_GLFW_WINDOW_HINT_STRING)
 else(BUILD_GLFW)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLFW.cmake)
   find_glfw()
@@ -77,9 +69,7 @@ find_package(OpenGL REQUIRED)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}/imgui ${CMAKE_CURRENT_BINARY_DIR}/gl3w/include
-  ${GLFW_INCLUDE_DIR} ${QUICKJS_INCLUDE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui ${CMAKE_CURRENT_BINARY_DIR}/gl3w/include ${GLFW_INCLUDE_DIR} ${QUICKJS_INCLUDE_DIR})
 
 link_directories(${QUICKJS_LIBRARY_DIR})
 
@@ -92,9 +82,7 @@ endif(USE_GL3W)
 set(imgui_LIBRARIES ${GLFW_LIBRARY} ${OPENGL_gl_LIBRARY})
 #set(imgui_DEPS gl3w)
 
-set(IMGUI_SOURCES
-    imgui/imgui.cpp imgui/imgui.h imgui/imgui_draw.cpp imgui/imgui_tables.cpp
-    imgui/imgui_widgets.cpp imgui/imgui_demo.cpp)
+set(IMGUI_SOURCES imgui/imgui.cpp imgui/imgui.h imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/imgui_demo.cpp)
 
 if(USE_GL3W)
   list(APPEND IMGUI_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/gl3w/src/gl3w.c)
@@ -105,19 +93,15 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends)
 option(IMGUI_DEMO "Build IMGUI demo" OFF)
 
 if(IMGUI_DEMO)
-  add_executable(
-    imgui_demo
-    imgui/examples/example_glfw_opengl3/main.cpp imgui/imgui_demo.cpp
-    ${IMGUI_SOURCES} imgui/backends/imgui_impl_glfw.cpp
-    imgui/backends/imgui_impl_opengl3.cpp)
+  add_executable(imgui_demo imgui/examples/example_glfw_opengl3/main.cpp imgui/imgui_demo.cpp ${IMGUI_SOURCES} imgui/backends/imgui_impl_glfw.cpp
+                            imgui/backends/imgui_impl_opengl3.cpp)
   target_link_libraries(imgui_demo ${imgui_LIBRARIES} ${imgui_DEPS} pthread dl)
 endif(IMGUI_DEMO)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 #add_definitions(-DIMGUI_USER_CONFIG=\"quickjs-imconfig.hpp\")
 
-file(GLOB QJS_IMGUI_SOURCES quickjs-imgui.cpp *.hpp ${IMGUI_SOURCES}
-     imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_glfw.h
-     imgui/backends/imgui_impl_opengl*.cpp imgui/backends/imgui_impl_opengl*.h)
+file(GLOB QJS_IMGUI_SOURCES quickjs-imgui.cpp *.hpp ${IMGUI_SOURCES} imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_glfw.h imgui/backends/imgui_impl_opengl*.cpp
+     imgui/backends/imgui_impl_opengl*.h)
 
 make_module(imgui ${QJS_IMGUI_SOURCES})
