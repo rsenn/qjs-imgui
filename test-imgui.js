@@ -1,7 +1,15 @@
-import { context, CONTEXT_VERSION_MAJOR, CONTEXT_VERSION_MINOR, OPENGL_CORE_PROFILE, OPENGL_FORWARD_COMPAT, OPENGL_PROFILE, poll, RESIZABLE, SAMPLES, Window } from 'glfw';
-import * as nvg from 'nanovg';
+import { context } from 'glfw';
+import { CONTEXT_VERSION_MAJOR } from 'glfw';
+import { CONTEXT_VERSION_MINOR } from 'glfw';
+import { OPENGL_CORE_PROFILE } from 'glfw';
+import { OPENGL_FORWARD_COMPAT } from 'glfw';
+import { OPENGL_PROFILE } from 'glfw';
+import { poll } from 'glfw';
+import { RESIZABLE } from 'glfw';
+import { SAMPLES } from 'glfw';
+import { Window } from 'glfw';
 import * as ImGui from 'imgui';
-
+import * as nvg from 'nanovg';
 let window /*, nvg*/;
 
 export function Clear(color = nvg.RGB(0, 0, 0)) {
@@ -343,5 +351,4 @@ const runMain = () => {
     console.log('ERROR:', error);
   }
 };
-
 import('console') .catch(runMain) .then(({ Console }) => ((globalThis.console = new Console({ inspectOptions: {} })), runMain()));
