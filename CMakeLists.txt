@@ -2,7 +2,7 @@ project(qjs-imgui C CXX)
 
 message("Building project [1;31m${PROJECT_NAME}[0m")
 
-option(BUILD_GLFW OFF "Build GLFW from sources")
+#[[option(BUILD_GLFW OFF "Build GLFW from sources")]]
 option(USE_GL3W OFF "Use GL3W instead of internal loader")
 option(USE_GLEW OFF "Use GLEW instead of internal loader")
 option(IMPL_OPENGL_ES2 OFF "Use OpenGL ES2")
@@ -31,7 +31,7 @@ if(USE_GLEW)
   link_libraries(${GLEW_LIBRARY})
 endif(USE_GLEW)
 
-if(BUILD_GLFW)
+#[[if(BUILD_GLFW)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildGLFW.cmake)
 
   build_glfw(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
@@ -41,7 +41,7 @@ if(BUILD_GLFW)
 else(BUILD_GLFW)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGLFW.cmake)
   find_glfw()
-endif(BUILD_GLFW)
+endif(BUILD_GLFW)]]
 
 if(USE_GL3W)
   build_gl3w()
@@ -63,13 +63,19 @@ endif(NOT USE_GLEW AND NOT USE_GL3W)
 find_quickjs()
 configure_quickjs()
 
+dump(QUICKJS_INSTALL_PREFIX)
+dump(QUICKJS_C_MODULE_DIR)
 #find_package(glfw3 3.1 REQUIRED)
 find_package(OpenGL REQUIRED)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui ${CMAKE_CURRENT_BINARY_DIR}/gl3w/include ${GLFW_INCLUDE_DIR} ${QUICKJS_INCLUDE_DIR})
+include_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}/imgui ${CMAKE_CURRENT_BINARY_DIR}/gl3w/include 
+  #${GLFW_INCLUDE_DIR}
+  ${QUICKJS_INCLUDE_DIR}
+)
 
 link_directories(${QUICKJS_LIBRARY_DIR})
 
@@ -79,7 +85,9 @@ if(USE_GL3W)
   endif(NOT TARGET gl3w_gen)
 endif(USE_GL3W)
 
-set(imgui_LIBRARIES ${GLFW_LIBRARY} ${OPENGL_gl_LIBRARY})
+set(imgui_LIBRARIES 
+  #${GLFW_LIBRARY} 
+  ${OPENGL_gl_LIBRARY})
 #set(imgui_DEPS gl3w)
 
 set(IMGUI_SOURCES imgui/imgui.cpp imgui/imgui.h imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/imgui_demo.cpp)
