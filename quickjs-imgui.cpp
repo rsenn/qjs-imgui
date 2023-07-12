@@ -173,19 +173,18 @@ template<typename T> struct SliderArgs {
   ~SliderArgs() {
     if(format && format_allocated) {
       JS_FreeCString(ctx, format);
-      format = 0;
+      format = nullptr;
     }
   }
 
   SliderArgs(JSContext* _ctx, int argc, JSValueConst argv[]) : ctx(_ctx) {
     vmin = JSVal<T>::to(ctx, argv[0]);
     vmax = JSVal<T>::to(ctx, argv[1]);
-    if(argc > 2 && !js_is_null_or_undefined(argv[2])) {
-      format = JS_ToCString(ctx, argv[2]);
-      format_allocated = true;
-    } else {
+
+    if(argc > 2 && !js_is_null_or_undefined(argv[2]) && (format = JS_ToCString(ctx, argv[2])))
+          format_allocated = true;
+    else
       format = "%.3f";
-    }
 
     if(argc > 3)
       flags = JSVal<int32_t>::to(ctx, argv[3]);

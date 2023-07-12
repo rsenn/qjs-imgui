@@ -101,7 +101,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends)
 option(IMGUI_DEMO "Build IMGUI demo" OFF)
 
 if(IMGUI_DEMO)
-  add_executable(imgui_demo imgui/examples/example_glfw_opengl3/main.cpp imgui/imgui_demo.cpp ${IMGUI_SOURCES} imgui/backends/imgui_impl_glfw.cpp
+  add_executable(imgui_demo imgui/examples/example_glfw_opengl3/main.cpp
+   imgui/imgui_demo.cpp ${IMGUI_SOURCES} imgui/backends/imgui_impl_glfw.cpp
                             imgui/backends/imgui_impl_opengl3.cpp)
   target_link_libraries(imgui_demo ${imgui_LIBRARIES} ${imgui_DEPS} pthread dl)
 endif(IMGUI_DEMO)
@@ -111,5 +112,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 file(GLOB QJS_IMGUI_SOURCES quickjs-imgui.cpp *.hpp ${IMGUI_SOURCES} imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_glfw.h imgui/backends/imgui_impl_opengl*.cpp
      imgui/backends/imgui_impl_opengl*.h)
+
+dump(QJS_IMGUI_SOURCES imgui_LIBRARIES imgui_DEPS)
 
 make_module(imgui ${QJS_IMGUI_SOURCES})
