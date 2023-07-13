@@ -143,7 +143,7 @@ const wrapGetSet = (gfn, fn) => [
   }
 ];
 
-let ptr = ImGui.Pointer(
+/*let ptr = ImGui.Pointer(
   ...wrapGetSet(
     () => show_app_main_menu_bar,
     v => (show_app_main_menu_bar = v)
@@ -158,20 +158,20 @@ let show_about_box = ImGui.Pointer(
 );
 let show_demo_window = ImGui.Pointer(false);
 let show_light_bg = ImGui.Pointer(true);
-let slider_value = ImGui.Pointer(0);
+let slider_value = ImGui.Pointer(0)*/;
 let text_buf = new ArrayBuffer(4096);
 let text_buf2 = new ArrayBuffer(4096 * 16);
 let slider2_value = [0, 0];
-let float_value = ImGui.Pointer(0.0);
+//let float_value = ImGui.Pointer(0.0);
 let scalar_value = new Float64Array([0]);
 
-let combo_index = 1;
+/*let combo_index = 1;
 let combo_value = ImGui.Pointer(
   ...wrapGetSet(
     () => combo_index,
     value => (combo_index = value)
   )
-);
+);*/
 
 function main() {
   for(let [prop, value] of [
@@ -220,14 +220,14 @@ function main() {
 
     ImGui.Text('This is some Text');
 
-    ImGui.Checkbox('Show About', show_about_box);
-    ImGui.Checkbox('Show Demo Window', show_demo_window);
-    ImGui.Checkbox('Light Background', show_light_bg);
-    ImGui.SliderFloat('Slider', slider_value, 0, 300, '%3.0f', 0);
-    ImGui.SliderFloat2('Slider2', slider2_value, 0, 300, '%3.0f', 0);
+    ImGui.Checkbox('Show About', v => console.log('Show about', v));
+    ImGui.Checkbox('Show Demo Window', v => console.log('Show demo', v));
+    ImGui.Checkbox('Light Background', v => console.log('Show light backgroundg', v));
+    ImGui.SliderFloat('Slider', v => console.log('slider value', v), 0, 300, '%3.0f', 0);
+    ImGui.SliderFloat2('Slider2', v => console.log('slider2 value', v), 0, 300, '%3.0f', 0);
     let items = ['beer', 'salad', 'pizza', 'pineapple'];
 
-    ImGui.Combo('Combo', combo_value, idx => items[idx], items.length);
+    ImGui.Combo('Combo', v => console.log('combo value', v), idx => items[idx], items.length);
 
     //ImGui.InputScalar('Scalar', ImGui.DataType.Double, scalar_value, 1, 10, '%3.0f', ImGui.InputTextFlags.CallbackAlways);
     let s8_v = new Int8Array(1);
@@ -255,7 +255,7 @@ function main() {
     ImGui.InputScalar('input double', ImGui.DataType.Double, f64_v, 1, 10);
 
     ImGui.InputTextMultiline('Text', text_buf2, text_buf2.byteLength, [100, 30], ImGui.InputTextFlags.CallbackAlways, data => console.log('InputTextMultiline event', data));
-    ImGui.InputFloat('Float', float_value, 1, 10, null, 0); //ImGui.InputTextFlags.CallbackAlways, data => console.log('InputFloat event', data));
+    ImGui.InputFloat('Float', v => console.log('float value', v), 1, 10, null, 0); //ImGui.InputTextFlags.CallbackAlways, data => console.log('InputFloat event', data));
     false &&
       ImGui.InputText('Text', text_buf, text_buf.byteLength, ImGui.InputTextFlags.CallbackAlways, data => {
         /* prettier-ignore */ const {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection } = data;
@@ -266,9 +266,9 @@ function main() {
     //if(ImGui.Button((!show_about_box() ? 'Show' : 'Hide') + ' about')) show_about_box(!show_about_box());
     //if(ImGui.Button((!show_demo_window() ? 'Show' : 'Hide') + ' demo')) show_demo_window(!show_demo_window());
 
-    if(show_about_box()) ImGui.ShowAboutWindow(show_about_box);
+  /*  if(show_about_box()) ImGui.ShowAboutWindow(show_about_box);
 
-    if(show_demo_window()) ImGui.ShowDemoWindow(show_demo_window);
+    if(show_demo_window()) ImGui.ShowDemoWindow(show_demo_window);*/
 
     // Menu Bar
     if(ImGui.BeginMenuBar()) {
@@ -312,7 +312,7 @@ function main() {
 
     if(ok) {
       nvg.BeginFrame(...window.size, 1);
-      Clear(nvg.RGB(...(show_light_bg() ? [0x66, 0x88, 0xff] : [0, 0, 0])));
+      Clear(nvg.RGB(...(false /*show_light_bg()*/ ? [0x66, 0x88, 0xff] : [0, 0, 0])));
 
       nvg.BeginPath();
 

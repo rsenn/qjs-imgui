@@ -12,7 +12,7 @@ endfunction(config_module TARGET_NAME)
 
 function(compile_module SOURCE)
   basename(BASE "${SOURCE}" .js)
-  message(STATUS "Compile QuickJS module '${BASE}.c' from '${SOURCE}'")
+  #message(STATUS "Compile QuickJS module '${BASE}.c' from '${SOURCE}'")
 
   set(MODULES_DIR "${CMAKE_BINARY_DIR}/modules")
   set(MODULES_DIR "${MODULES_DIR}" PARENT_SCOPE)
@@ -190,7 +190,20 @@ function(make_module FNAME)
   endif(ARGN)
   add_unique(LIBS ${COMMON_LIBRARIES})
 
-  message(STATUS "Building QuickJS module: ${FNAME} (deps: ${DEPS}, libs: ${LIBS}) JS_${UNAME}_MODULE=1")
+  set(MSG "Building QuickJS module: ${FNAME}")
+
+  if(DEPS)
+    set(MSG "${MSG} (deps: ${DEPS})")
+  endif()
+  set(OUT "${LIBS}")
+  list(REMOVE_ITEM OUT compiled)
+  list(REMOVE_ITEM OUT modules)
+  if(OUT)
+    string(REPLACE ";" " " OUT "${OUT}")
+    set(MSG "${MSG} (libs: ${OUT})")
+  endif()
+
+  #message(STATUS "${MSG}")
 
   if(WASI OR EMSCRIPTEN OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
     set(BUILD_SHARED_MODULES OFF)
@@ -209,7 +222,7 @@ function(make_module FNAME)
     add_library(${TARGET_NAME} SHARED ${SOURCES})
 
     set_target_properties(
-      ${TARGET_NAME} PROPERTIES RPATH "${QUICKJS_C_MODULE_DIR}" INSTALL_RPATH "${QUICKJS_C_MODULE_DIR}" PREFIX "${PREFIX}" OUTPUT_NAME "${VNAME}"
+      ${TARGET_NAME} PROPERTIES RPATH "${MBEDTLS_LIBRARY_DIR}:${QUICKJS_C_MODULE_DIR}" INSTALL_RPATH "${QUICKJS_C_MODULE_DIR}" PREFIX "${PREFIX}" OUTPUT_NAME "${VNAME}"
                                 COMPILE_FLAGS "${MODULE_COMPILE_FLAGS}")
 
     target_compile_definitions(${TARGET_NAME} PRIVATE _GNU_SOURCE=1 JS_SHARED_LIBRARY=1 JS_${UNAME}_MODULE=1 QUICKJS_PREFIX="${QUICKJS_INSTALL_PREFIX}")
@@ -217,16 +230,9 @@ function(make_module FNAME)
     target_link_directories(${TARGET_NAME} PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(${TARGET_NAME} PUBLIC ${LIBS} ${QUICKJS_LIBRARY})
 
+    install(TARGETS ${TARGET_NAME} DESTINATION "${QUICKJS_C_MODULE_DIR}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+
     config_module(${TARGET_NAME})
-
-
-dump(CMAKE_INSTALL_PREFIX)
-
-dump(TARGET_NAME)
-
-
-    install(TARGETS ${TARGET_NAME} RUNTIME DESTINATION "${QUICKJS_C_MODULE_DIR}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-
 
     set(LIBRARIES ${${VNAME}_LIBRARIES})
     if(LIBRARIES)
@@ -238,16 +244,17 @@ dump(TARGET_NAME)
 
   endif(BUILD_SHARED_MODULES)
 
-  add_library(${TARGET_NAME}-static STATIC ${SOURCES})
+  list(APPEND MODULES_SOURCES quickjs-${NAME}.c)
+  set(MODULES_SOURCES "${MODULES_SOURCES}" PARENT_SCOPE)
 
+  #[[add_library(${TARGET_NAME}-static STATIC ${SOURCES})
   set(MODULES_STATIC "${QJS_MODULES_STATIC}")
   list(APPEND MODULES_STATIC "${TARGET_NAME}-static")
   set(QJS_MODULES_STATIC "${MODULES_STATIC}" PARENT_SCOPE)
-
   set_target_properties(${TARGET_NAME}-static PROPERTIES OUTPUT_NAME "${VNAME}" PREFIX "quickjs-" SUFFIX "${LIBRARY_SUFFIX}" COMPILE_FLAGS "")
   target_compile_definitions(${TARGET_NAME}-static PRIVATE _GNU_SOURCE=1 JS_${UNAME}_MODULE=1 QUICKJS_PREFIX="${QUICKJS_INSTALL_PREFIX}")
   target_link_directories(${TARGET_NAME}-static PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
-  target_link_libraries(${TARGET_NAME}-static INTERFACE ${QUICKJS_LIBRARY})
+  target_link_libraries(${TARGET_NAME}-static INTERFACE ${QUICKJS_LIBRARY})]]
 
 endfunction()
 
