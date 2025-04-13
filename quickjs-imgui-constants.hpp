@@ -310,11 +310,11 @@ static const JSCFunctionListEntry js_imgui_key[] = {
 };
 
 static const JSCFunctionListEntry js_imgui_keymod_flags[] = {
-    JS_PROP_INT32_DEF("None", ImGuiKeyModFlags_None, 0),
-    JS_PROP_INT32_DEF("Ctrl", ImGuiKeyModFlags_Ctrl, 0),
-    JS_PROP_INT32_DEF("Shift", ImGuiKeyModFlags_Shift, 0),
-    JS_PROP_INT32_DEF("Alt", ImGuiKeyModFlags_Alt, 0),
-    JS_PROP_INT32_DEF("Super", ImGuiKeyModFlags_Super, 0),
+    JS_PROP_INT32_DEF("None", ImGuiModFlags_None, 0),
+    JS_PROP_INT32_DEF("Ctrl", ImGuiModFlags_Ctrl, 0),
+    JS_PROP_INT32_DEF("Shift", ImGuiModFlags_Shift, 0),
+    JS_PROP_INT32_DEF("Alt", ImGuiModFlags_Alt, 0),
+    JS_PROP_INT32_DEF("Super", ImGuiModFlags_Super, 0),
 };
 
 static const JSCFunctionListEntry js_imgui_navinput[] = {
@@ -326,9 +326,9 @@ static const JSCFunctionListEntry js_imgui_navinput[] = {
     JS_PROP_INT32_DEF("LStickUp", ImGuiNavInput_LStickUp, 0),     JS_PROP_INT32_DEF("LStickDown", ImGuiNavInput_LStickDown, 0),
     JS_PROP_INT32_DEF("FocusPrev", ImGuiNavInput_FocusPrev, 0),   JS_PROP_INT32_DEF("FocusNext", ImGuiNavInput_FocusNext, 0),
     JS_PROP_INT32_DEF("TweakSlow", ImGuiNavInput_TweakSlow, 0),   JS_PROP_INT32_DEF("TweakFast", ImGuiNavInput_TweakFast, 0),
-    JS_PROP_INT32_DEF("KeyLeft_", ImGuiNavInput_KeyLeft_, 0),     JS_PROP_INT32_DEF("KeyRight_", ImGuiNavInput_KeyRight_, 0),
-    JS_PROP_INT32_DEF("KeyUp_", ImGuiNavInput_KeyUp_, 0),         JS_PROP_INT32_DEF("KeyDown_", ImGuiNavInput_KeyDown_, 0),
-    JS_PROP_INT32_DEF("COUNT", ImGuiNavInput_COUNT, 0),           JS_PROP_INT32_DEF("InternalStart_", ImGuiNavInput_InternalStart_, 0),
+    JS_PROP_INT32_DEF("DpadLeft", ImGuiNavInput_DpadLeft, 0),     JS_PROP_INT32_DEF("DpadRight", ImGuiNavInput_DpadRight, 0),
+    JS_PROP_INT32_DEF("DpadUp", ImGuiNavInput_DpadUp, 0),         JS_PROP_INT32_DEF("DpadDown", ImGuiNavInput_DpadDown, 0),
+    JS_PROP_INT32_DEF("COUNT", ImGuiNavInput_COUNT, 0),           //JS_PROP_INT32_DEF("InternalStart_", ImGuiNavInput_InternalStart_, 0),
 };
 
 static const JSCFunctionListEntry js_imgui_config_flags[] = {
@@ -476,7 +476,7 @@ static const JSCFunctionListEntry js_imgui_coloredit_flags[] = {
     JS_PROP_INT32_DEF("DataTypeMask_", ImGuiColorEditFlags_DataTypeMask_, 0),
     JS_PROP_INT32_DEF("PickerMask_", ImGuiColorEditFlags_PickerMask_, 0),
     JS_PROP_INT32_DEF("InputMask_", ImGuiColorEditFlags_InputMask_, 0),
-#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+#if 0 //IMGUI_DISABLE_OBSOLETE_FUNCTIONS
     JS_PROP_INT32_DEF("RGB", ImGuiColorEditFlags_RGB, 0),
     JS_PROP_INT32_DEF("HSV", ImGuiColorEditFlags_HSV, 0),
     JS_PROP_INT32_DEF("HEX", ImGuiColorEditFlags_HEX, 0),
@@ -490,7 +490,7 @@ static const JSCFunctionListEntry js_imgui_slider_flags[] = {
     JS_PROP_INT32_DEF("NoRoundToFormat", ImGuiSliderFlags_NoRoundToFormat, 0),
     JS_PROP_INT32_DEF("NoInput", ImGuiSliderFlags_NoInput, 0),
     JS_PROP_INT32_DEF("InvalidMask_", ImGuiSliderFlags_InvalidMask_, 0),
-#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+#if 0 //IMGUI_DISABLE_OBSOLETE_FUNCTIONS
     JS_PROP_INT32_DEF("ClampOnInput", ImGuiSliderFlags_ClampOnInput, 0),
 #endif
 };

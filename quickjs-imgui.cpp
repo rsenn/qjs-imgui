@@ -2447,13 +2447,13 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
       case IMGUI_GET_KEY_INDEX: {
         int32_t imgui_key;
         JS_ToInt32(ctx, &imgui_key, argv[0]);
-        ret = JS_NewInt32(ctx, ImGui::GetKeyIndex(imgui_key));
+        ret = JS_NewInt32(ctx, ImGui::GetKeyIndex(ImGuiKey(imgui_key)));
         break;
       }
       case IMGUI_IS_KEY_DOWN: {
         int32_t user_key_index;
         JS_ToInt32(ctx, &user_key_index, argv[0]);
-        ret = JS_NewBool(ctx, ImGui::IsKeyDown(user_key_index));
+        ret = JS_NewBool(ctx, ImGui::IsKeyDown(ImGuiKey(user_key_index)));
         break;
       }
       case IMGUI_IS_KEY_PRESSED: {
@@ -2462,13 +2462,13 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         if(argc >= 2)
           repeat = JS_ToBool(ctx, argv[1]);
         JS_ToInt32(ctx, &user_key_index, argv[0]);
-        ret = JS_NewBool(ctx, ImGui::IsKeyPressed(user_key_index, repeat));
+        ret = JS_NewBool(ctx, ImGui::IsKeyPressed(ImGuiKey(user_key_index), repeat));
         break;
       }
       case IMGUI_IS_KEY_RELEASED: {
         int32_t user_key_index;
         JS_ToInt32(ctx, &user_key_index, argv[0]);
-        ret = JS_NewBool(ctx, ImGui::IsKeyReleased(user_key_index));
+        ret = JS_NewBool(ctx, ImGui::IsKeyReleased(ImGuiKey(user_key_index)));
         break;
       }
       case IMGUI_GET_KEY_PRESSED_AMOUNT: {
@@ -2477,7 +2477,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         JS_ToInt32(ctx, &key_index, argv[0]);
         JS_ToFloat64(ctx, &repeat_delay, argv[1]);
         JS_ToFloat64(ctx, &rate, argv[2]);
-        ret = JS_NewInt32(ctx, ImGui::GetKeyPressedAmount(key_index, repeat_delay, rate));
+        ret = JS_NewInt32(ctx, ImGui::GetKeyPressedAmount(ImGuiKey(key_index), repeat_delay, rate));
         break;
       }
       case IMGUI_IS_MOUSE_DOWN: {
