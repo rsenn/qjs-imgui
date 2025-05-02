@@ -63,8 +63,8 @@ endif(NOT USE_GLEW AND NOT USE_GL3W)
 find_quickjs()
 configure_quickjs()
 
-dump(QUICKJS_INSTALL_PREFIX)
-dump(QUICKJS_C_MODULE_DIR)
+#dump(QUICKJS_INSTALL_PREFIX)
+#dump(QUICKJS_C_MODULE_DIR)
 #find_package(glfw3 3.1 REQUIRED)
 find_package(OpenGL REQUIRED)
 
@@ -110,6 +110,6 @@ file(GLOB QJS_IMGUI_SOURCES quickjs-imgui.cpp *.hpp ${IMGUI_SOURCES}
      imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_glfw.h
      imgui/backends/imgui_impl_opengl*.cpp imgui/backends/imgui_impl_opengl*.h)
 
-dump(QJS_IMGUI_SOURCES imgui_LIBRARIES imgui_DEPS)
+#dump(QJS_IMGUI_SOURCES imgui_LIBRARIES imgui_DEPS)
 
 make_module(imgui ${QJS_IMGUI_SOURCES})
