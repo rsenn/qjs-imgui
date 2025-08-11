@@ -7,7 +7,7 @@ option(USE_GL3W OFF "Use GL3W instead of internal loader")
 option(USE_GLEW OFF "Use GLEW instead of internal loader")
 option(IMPL_OPENGL_ES2 OFF "Use OpenGL ES2")
 
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.5)
 
 set(CMAKE_CXX_STANDARD c++20)
 
