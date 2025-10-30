@@ -1,13 +1,4 @@
-import { context } from 'glfw';
-import { CONTEXT_VERSION_MAJOR } from 'glfw';
-import { CONTEXT_VERSION_MINOR } from 'glfw';
-import { OPENGL_CORE_PROFILE } from 'glfw';
-import { OPENGL_FORWARD_COMPAT } from 'glfw';
-import { OPENGL_PROFILE } from 'glfw';
-import { poll } from 'glfw';
-import { RESIZABLE } from 'glfw';
-import { SAMPLES } from 'glfw';
-import { Window } from 'glfw';
+import { context, CONTEXT_VERSION_MAJOR, CONTEXT_VERSION_MINOR, OPENGL_CORE_PROFILE, OPENGL_FORWARD_COMPAT, OPENGL_PROFILE, poll, RESIZABLE, SAMPLES, Window } from 'glfw';
 import * as ImGui from 'imgui';
 import * as nvg from 'nanovg';
 let window /*, nvg*/;
@@ -140,7 +131,7 @@ const wrapGetSet = (gfn, fn) => [
       fn(value);
       console.log('value changed from', old, 'to', value);
     }
-  }
+  },
 ];
 
 /*let ptr = ImGui.Pointer(
@@ -151,14 +142,12 @@ const wrapGetSet = (gfn, fn) => [
 );
 
 let ptr2 = ImGui.Pointer(false);
-
-let show_about_box = ImGui.Pointer(
-  () => show_app_about,
-  value => (show_app_about = value)
-);
+*/
+/*let show_about_box = ImGui.Pointer(() => show_app_about, value => (show_app_about = value) );
 let show_demo_window = ImGui.Pointer(false);
 let show_light_bg = ImGui.Pointer(true);
-let slider_value = ImGui.Pointer(0)*/;
+let slider_value = ImGui.Pointer(0);*/
+let show_demo_window = false;
 let text_buf = new ArrayBuffer(4096);
 let text_buf2 = new ArrayBuffer(4096 * 16);
 let slider2_value = [0, 0];
@@ -180,7 +169,7 @@ function main() {
     [OPENGL_PROFILE, OPENGL_CORE_PROFILE],
     [OPENGL_FORWARD_COMPAT, true],
     [RESIZABLE, true],
-    [SAMPLES, 4]
+    [SAMPLES, 4],
   ])
     Window.hint(prop, value);
 
@@ -227,7 +216,12 @@ function main() {
     ImGui.SliderFloat2('Slider2', v => console.log('slider2 value', v), 0, 300, '%3.0f', 0);
     let items = ['beer', 'salad', 'pizza', 'pineapple'];
 
-    ImGui.Combo('Combo', v => console.log('combo value', v), idx => items[idx], items.length);
+    ImGui.Combo(
+      'Combo',
+      v => console.log('combo value', v),
+      idx => items[idx],
+      items.length,
+    );
 
     //ImGui.InputScalar('Scalar', ImGui.DataType.Double, scalar_value, 1, 10, '%3.0f', ImGui.InputTextFlags.CallbackAlways);
     let s8_v = new Int8Array(1);
@@ -266,9 +260,9 @@ function main() {
     //if(ImGui.Button((!show_about_box() ? 'Show' : 'Hide') + ' about')) show_about_box(!show_about_box());
     //if(ImGui.Button((!show_demo_window() ? 'Show' : 'Hide') + ' demo')) show_demo_window(!show_demo_window());
 
-  /*  if(show_about_box()) ImGui.ShowAboutWindow(show_about_box);
+    /*  if(show_about_box()) ImGui.ShowAboutWindow(show_about_box);*/
 
-    if(show_demo_window()) ImGui.ShowDemoWindow(show_demo_window);*/
+    if(show_demo_window) ImGui.ShowDemoWindow(show_demo_window);
 
     // Menu Bar
     if(ImGui.BeginMenuBar()) {
@@ -277,11 +271,11 @@ function main() {
         ImGui.EndMenu();
       }
       if(ImGui.BeginMenu('Examples')) {
-        ImGui.MenuItem('Main menu bar', null, ptr ?? (v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v))));
+        ImGui.MenuItem('Main menu bar', null, /*ptr ?? */ v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v)));
 
         //console.log('show_app_main_menu_bar', show_app_main_menu_bar);
 
-        ImGui.MenuItem('Show Demo Window', null, show_demo_window);
+        ImGui.MenuItem('Show Demo Window', null, v => (v === undefined ? show_demo_window : (show_demo_window = v)));
         ImGui.MenuItem('Console', null, v => (v === undefined ? show_app_console : (show_app_console = v)));
         ImGui.MenuItem('Log', null, v => (v === undefined ? show_app_log : (show_app_log = v)));
         ImGui.MenuItem('Simple layout', null, v => (v === undefined ? show_app_layout : (show_app_layout = v)));
@@ -351,4 +345,4 @@ const runMain = () => {
     console.log('ERROR:', error);
   }
 };
-import('console') .catch(runMain) .then(({ Console }) => ((globalThis.console = new Console({ inspectOptions: {} })), runMain()));
+import('console').catch(runMain).then(({ Console }) => ((globalThis.console = new Console({ inspectOptions: {} })), runMain()));

@@ -8,7 +8,7 @@
 #endif
 
 #include <imgui.h>
-#include <cassert>
+  #include <cassert>
 #include <cctype>
 #include <GLFW/glfw3.h>
 
@@ -16,7 +16,7 @@
 #include "quickjs-imgui-constants.hpp"
 #include "quickjs-imgui-payload.hpp"
 #include "quickjs-imgui-io.hpp"
-//#include "quickjs-imgui-pointer.hpp"
+// #include "quickjs-imgui-pointer.hpp"
 #include "quickjs-imfont.hpp"
 #include "quickjs-imfontatlas.hpp"
 #include "quickjs-imdrawdata.hpp"
@@ -86,7 +86,8 @@ js_imgui_formatcount(JSContext* ctx, int argc, JSValueConst argv[]) {
   for(p = fmt; p < end; p++) {
     if(*p == '%' && p[1] != '%') {
       ++p;
-      while(isdigit(*p) || *p == '.' || *p == '-' || *p == '+' || *p == '*') ++p;
+      while(isdigit(*p) || *p == '.' || *p == '-' || *p == '+' || *p == '*')
+        ++p;
       ++i;
     }
   }
@@ -95,7 +96,7 @@ js_imgui_formatcount(JSContext* ctx, int argc, JSValueConst argv[]) {
 }
 
 static void
-js_imgui_formatargs(JSContext* ctx, int argc, JSValueConst argv[], void* output[]) {
+js_imgui_formatargs(JSContext* ctx, int argc, JSValueConst argv[], void** output) {
   const char *p, *end, *fmt;
   int i = 0;
 
@@ -108,7 +109,8 @@ js_imgui_formatargs(JSContext* ctx, int argc, JSValueConst argv[], void* output[
     if(*p == '%' && p[1] != '%') {
       ++p;
 
-      while(isdigit(*p) || *p == '.' || *p == '-' || *p == '+' || *p == '*') ++p;
+      while(isdigit(*p) || *p == '.' || *p == '-' || *p == '+' || *p == '*')
+        ++p;
 
       switch(*p) {
         case 'd':
@@ -182,7 +184,7 @@ template<typename T> struct SliderArgs {
     vmax = JSVal<T>::to(ctx, argv[1]);
 
     if(argc > 2 && !js_is_null_or_undefined(argv[2]) && (format = JS_ToCString(ctx, argv[2])))
-          format_allocated = true;
+      format_allocated = true;
     else
       format = "%.3f";
 
@@ -529,6 +531,10 @@ static JSValue
 js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst argv[], int magic) {
   JSValue ret = JS_UNDEFINED;
 
+  if(magic > IMGUI_CREATE_CONTEXT)
+    if(ImGui::GetCurrentContext() == nullptr)
+      return JS_ThrowInternalError(ctx, "No current ImGuiContext*");
+
   try {
 
     switch(magic) {
@@ -609,7 +615,7 @@ js_imgui_functions(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
         break;
       }
       case IMGUI_DESTROY_CONTEXT: {
-        ImGuiContext* context = argc > 0 ? js_imgui_getptr<ImGuiContext>(ctx, argv[0]) : 0;
+        ImGuiContext* context = argc > 0 ? js_imgui_getptr<ImGuiContext>(ctx, argv[0]) : ImGui::GetCurrentContext();
 
         ret = js_invoke_all(ctx, imgui_implementations, "Shutdown");
 
