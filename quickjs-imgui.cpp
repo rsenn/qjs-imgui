@@ -8,7 +8,7 @@
 #endif
 
 #include <imgui.h>
-  #include <cassert>
+#include <cassert>
 #include <cctype>
 #include <GLFW/glfw3.h>
 
