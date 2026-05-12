@@ -4,13 +4,13 @@ Dear ImGui bindings for QuickJS. Wraps the immediate-mode GUI library.
 The JS API mirrors the C++ ImGui:: namespace directly — function names are
 identical (no prefix).
 
-Import: `import * as ImGui from 'imgui.so';`
+Import: `import * as ImGui from 'imgui';`
 
 ## Typical frame loop (with GLFW + OpenGL)
 
 ```js
-import * as ImGui from 'imgui.so';
-import { Window, poll, ... } from 'glfw.so';
+import * as ImGui from 'imgui';
+import { Window, poll, ... } from 'glfw';
 
 // --- init (once) ---
 ImGui.CreateContext();
