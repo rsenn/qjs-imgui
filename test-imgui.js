@@ -9,10 +9,10 @@ import { RESIZABLE } from 'glfw';
 import { SAMPLES } from 'glfw';
 import { Window } from 'glfw';
 import * as ImGui from 'imgui';
-import * as nvg from 'nanovg';
-let window /*, nvg*/;
+import { CreateGL3, RGB, STENCIL_STROKES, ANTIALIAS, DEBUG } from 'nanovg';
+let window, nvg;
 
-export function Clear(color = nvg.RGB(0, 0, 0)) {
+export function Clear(color = RGB(0, 0, 0)) {
   const { size } = window;
 
   nvg.Save();
@@ -194,8 +194,8 @@ function main() {
     }
   };
 
-  let ok = nvg.CreateGL3(nvg.STENCIL_STROKES | nvg.ANTIALIAS | nvg.DEBUG);
-  console.log('nvg.CreateGL3() =', ok);
+  nvg = CreateGL3(STENCIL_STROKES | ANTIALIAS | DEBUG);
+  console.log('CreateGL3() =', nvg);
 
   ImGui.Init(ImGui.ImplGlfw, ImGui.ImplOpenGL3);
   ImGui.CreateContext(window);
@@ -313,9 +313,10 @@ function main() {
 
     ImGui.Render();
 
-    if(ok) {
+    if(nvg) {
       nvg.BeginFrame(...window.size, 1);
-      Clear(nvg.RGB(...(false /*show_light_bg()*/ ? [0x66, 0x88, 0xff] : [0, 0, 0])));
+      console.log('nvg', nvg);
+      Clear(RGB(...(false /*show_light_bg()*/ ? [0x66, 0x88, 0xff] : [0, 0, 0])));
 
       nvg.BeginPath();
 
@@ -329,7 +330,7 @@ function main() {
       nvg.LineTo(0, 50);
       nvg.ClosePath();
 
-      nvg.StrokeColor(nvg.RGB(255, 255, 40));
+      nvg.StrokeColor(RGB(255, 255, 40));
       nvg.StrokeWidth(2);
       nvg.Stroke();
 
