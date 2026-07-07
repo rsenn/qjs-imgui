@@ -1,16 +1,12 @@
-import { context } from 'glfw';
-import { CONTEXT_VERSION_MAJOR } from 'glfw';
-import { CONTEXT_VERSION_MINOR } from 'glfw';
-import { OPENGL_CORE_PROFILE } from 'glfw';
-import { OPENGL_FORWARD_COMPAT } from 'glfw';
-import { OPENGL_PROFILE } from 'glfw';
-import { poll } from 'glfw';
-import { RESIZABLE } from 'glfw';
-import { SAMPLES } from 'glfw';
-import { Window } from 'glfw';
+import { context, CONTEXT_VERSION_MAJOR, CONTEXT_VERSION_MINOR, OPENGL_CORE_PROFILE, OPENGL_FORWARD_COMPAT, OPENGL_PROFILE, poll, RESIZABLE, SAMPLES, Window } from 'glfw';
 import * as ImGui from 'imgui';
 import { CreateGL3, RGB, STENCIL_STROKES, ANTIALIAS, DEBUG } from 'nanovg';
 let window, nvg;
+
+function debug(...args) {
+  if(process.env.DEBUG)
+    console.log(...args);
+}
 
 export function Clear(color = RGB(0, 0, 0)) {
   const { size } = window;
@@ -218,16 +214,16 @@ function main() {
 
     ImGui.Text('This is some Text');
 
-    ImGui.Checkbox('Show About', v => console.log('Show about', v));
-    ImGui.Checkbox('Show Demo Window', v => console.log('Show demo', v));
-    ImGui.Checkbox('Light Background', v => console.log('Show light backgroundg', v));
-    ImGui.SliderFloat('Slider', v => console.log('slider value', v), 0, 300, '%3.0f', 0);
-    ImGui.SliderFloat2('Slider2', v => console.log('slider2 value', v), 0, 300, '%3.0f', 0);
+    ImGui.Checkbox('Show About', v => debug('Show about', v));
+    ImGui.Checkbox('Show Demo Window', v => debug('Show demo', v));
+    ImGui.Checkbox('Light Background', v => debug('Show light background', v));
+    ImGui.SliderFloat('Slider', v => debug('slider value', v), 0, 300, '%3.0f', 0);
+    ImGui.SliderFloat2('Slider2', v => debug('slider2 value', v), 0, 300, '%3.0f', 0);
     let items = ['beer', 'salad', 'pizza', 'pineapple'];
 
     ImGui.Combo(
       'Combo',
-      v => console.log('combo value', v),
+      v => debug('combo value', v),
       idx => items[idx],
       items.length,
     );
