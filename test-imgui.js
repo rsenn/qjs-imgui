@@ -1,11 +1,10 @@
-import { context, CONTEXT_VERSION_MAJOR, CONTEXT_VERSION_MINOR, OPENGL_CORE_PROFILE, OPENGL_FORWARD_COMPAT, OPENGL_PROFILE, poll, RESIZABLE, SAMPLES, Window } from 'glfw';
+import { context, CONTEXT_VERSION_MAJOR, CONTEXT_VERSION_MINOR, OPENGL_CORE_PROFILE, OPENGL_FORWARD_COMPAT, OPENGL_PROFILE, poll, RESIZABLE, SAMPLES, Window, } from 'glfw';
 import * as ImGui from 'imgui';
 import { CreateGL3, RGB, STENCIL_STROKES, ANTIALIAS, DEBUG } from 'nanovg';
 let window, nvg;
 
 function debug(...args) {
-  if(process.env.DEBUG)
-    console.log(...args);
+  if(process.env.DEBUG) console.log(...args);
 }
 
 export function Clear(color = RGB(0, 0, 0)) {
@@ -58,14 +57,29 @@ function ShowExampleMenuFile() {
 
   ImGui.Separator();
   if(ImGui.BeginMenu('Options')) {
-    ImGui.MenuItem('Enabled', '', val => (val === undefined ? menuEnabled : (menuEnabled = val)));
+    ImGui.MenuItem('Enabled', '', val =>
+      val === undefined ? menuEnabled : (menuEnabled = val),
+    );
     ImGui.BeginChild('child', [0, 60], true);
     for(let i = 0; i < 10; i++) ImGui.Text('Scrolling Text %d', i);
     ImGui.EndChild();
 
-    ImGui.SliderFloat('Value', val => (val === undefined ? floatValue : (floatValue = val)), 0.0, 1.0);
-    ImGui.InputFloat('Input', val => (val === undefined ? floatValue : (floatValue = val)), 0.1);
-    ImGui.Combo('Combo', val => (val === undefined ? intValue : (intValue = val)), 'Yes\0No\0Maybe\0\0');
+    ImGui.SliderFloat(
+      'Value',
+      val => (val === undefined ? floatValue : (floatValue = val)),
+      0.0,
+      1.0,
+    );
+    ImGui.InputFloat(
+      'Input',
+      val => (val === undefined ? floatValue : (floatValue = val)),
+      0.1,
+    );
+    ImGui.Combo(
+      'Combo',
+      val => (val === undefined ? intValue : (intValue = val)),
+      'Yes\0No\0Maybe\0\0',
+    );
     ImGui.EndMenu();
   }
 
@@ -93,7 +107,9 @@ function ShowExampleMenuFile() {
   // In a real code-base using it would make senses to use this feature from very different code locations.
   if(ImGui.BeginMenu('Options')) {
     // <-- Append!
-    ImGui.Checkbox('SomeOption', val => (val === undefined ? boolValue : (boolValue = val)));
+    ImGui.Checkbox('SomeOption', val =>
+      val === undefined ? boolValue : (boolValue = val),
+    );
     ImGui.EndMenu();
   }
 
@@ -178,7 +194,10 @@ function main() {
   ])
     Window.hint(prop, value);
 
-  window = context.current = ImGui.ImplGlfw.CreateWindow = new Window(1280, 800, 'ImGui test');
+  window =
+    context.current =
+    ImGui.ImplGlfw.CreateWindow =
+      new Window(1280, 800, 'ImGui test');
   console.log('new Window() =', window.id);
 
   window.handleChar = c => {
@@ -217,8 +236,22 @@ function main() {
     ImGui.Checkbox('Show About', v => debug('Show about', v));
     ImGui.Checkbox('Show Demo Window', v => debug('Show demo', v));
     ImGui.Checkbox('Light Background', v => debug('Show light background', v));
-    ImGui.SliderFloat('Slider', v => debug('slider value', v), 0, 300, '%3.0f', 0);
-    ImGui.SliderFloat2('Slider2', v => debug('slider2 value', v), 0, 300, '%3.0f', 0);
+    ImGui.SliderFloat(
+      'Slider',
+      v => debug('slider value', v),
+      0,
+      300,
+      '%3.0f',
+      0,
+    );
+    ImGui.SliderFloat2(
+      'Slider2',
+      v => debug('slider2 value', v),
+      0,
+      300,
+      '%3.0f',
+      0,
+    );
     let items = ['beer', 'salad', 'pizza', 'pineapple'];
 
     ImGui.Combo(
@@ -245,21 +278,55 @@ function main() {
     ImGui.InputScalar('input s16', ImGui.DataType.S16, s16_v, 1, 10, '%d');
     ImGui.InputScalar('input u16', ImGui.DataType.U16, u16_v, 1, 10, '%u');
     ImGui.InputScalar('input s32', ImGui.DataType.S32, s32_v, 1, 10, '%d');
-    ImGui.InputScalar('input s32 hex', ImGui.DataType.S32, s32_v, 1, 10, '%08X');
+    ImGui.InputScalar(
+      'input s32 hex',
+      ImGui.DataType.S32,
+      s32_v,
+      1,
+      10,
+      '%08X',
+    );
     ImGui.InputScalar('input u32', ImGui.DataType.U32, u32_v, 1, 10, '%u');
-    ImGui.InputScalar('input u32 hex', ImGui.DataType.U32, u32_v, 1, 10, '%08X');
+    ImGui.InputScalar(
+      'input u32 hex',
+      ImGui.DataType.U32,
+      u32_v,
+      1,
+      10,
+      '%08X',
+    );
     ImGui.InputScalar('input s64', ImGui.DataType.S64, s64_v, 1, 10);
     ImGui.InputScalar('input u64', ImGui.DataType.U64, u64_v, 1, 10);
     ImGui.InputScalar('input float', ImGui.DataType.Float, f32_v, 1, 10);
     ImGui.InputScalar('input double', ImGui.DataType.Double, f64_v, 1, 10);
 
-    ImGui.InputTextMultiline('Text', text_buf2, text_buf2.byteLength, [100, 30], ImGui.InputTextFlags.CallbackAlways, data => console.log('InputTextMultiline event', data));
-    ImGui.InputFloat('Float', v => console.log('float value', v), 1, 10, null, 0); //ImGui.InputTextFlags.CallbackAlways, data => console.log('InputFloat event', data));
+    ImGui.InputTextMultiline(
+      'Text',
+      text_buf2,
+      text_buf2.byteLength,
+      [100, 30],
+      ImGui.InputTextFlags.CallbackAlways,
+      data => console.log('InputTextMultiline event', data),
+    );
+    ImGui.InputFloat(
+      'Float',
+      v => console.log('float value', v),
+      1,
+      10,
+      null,
+      0,
+    ); //ImGui.InputTextFlags.CallbackAlways, data => console.log('InputFloat event', data));
     false &&
-      ImGui.InputText('Text', text_buf, text_buf.byteLength, ImGui.InputTextFlags.CallbackAlways, data => {
-        /* prettier-ignore */ const {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection } = data;
-        /* prettier-ignore */ console.log('InputText event', {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection });
-      });
+      ImGui.InputText(
+        'Text',
+        text_buf,
+        text_buf.byteLength,
+        ImGui.InputTextFlags.CallbackAlways,
+        data => {
+          /* prettier-ignore */ const {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection } = data;
+          /* prettier-ignore */ console.log('InputText event', {EventFlag, Flags, EventChar, EventKey, buf, BufTextLen, BufSize, BufDirty, CursorPos, SelectionStart, SelectionEnd, DeleteChars, InsertChars, SelectAll, ClearSelection });
+        },
+      );
 
     //if(ImGui.Button(!show_light_bg() ? 'Light' : 'Dark')) show_light_bg(!show_light_bg());
     //if(ImGui.Button((!show_about_box() ? 'Show' : 'Hide') + ' about')) show_about_box(!show_about_box());
@@ -276,30 +343,79 @@ function main() {
         ImGui.EndMenu();
       }
       if(ImGui.BeginMenu('Examples')) {
-        ImGui.MenuItem('Main menu bar', null, /*ptr ?? */ v => (v === undefined ? show_app_main_menu_bar : (show_app_main_menu_bar = v)));
+        ImGui.MenuItem(
+          'Main menu bar',
+          null,
+          /*ptr ?? */ v =>
+            v === undefined
+              ? show_app_main_menu_bar
+              : (show_app_main_menu_bar = v),
+        );
 
         //console.log('show_app_main_menu_bar', show_app_main_menu_bar);
 
-        ImGui.MenuItem('Show Demo Window', null, v => (v === undefined ? show_demo_window : (show_demo_window = v)));
-        ImGui.MenuItem('Console', null, v => (v === undefined ? show_app_console : (show_app_console = v)));
-        ImGui.MenuItem('Log', null, v => (v === undefined ? show_app_log : (show_app_log = v)));
-        ImGui.MenuItem('Simple layout', null, v => (v === undefined ? show_app_layout : (show_app_layout = v)));
-        ImGui.MenuItem('Property editor', null, v => (v === undefined ? show_app_property_editor : (show_app_property_editor = v)));
-        ImGui.MenuItem('Long text display', null, v => (v === undefined ? show_app_long_text : (show_app_long_text = v)));
-        ImGui.MenuItem('Auto-resizing window', null, v => (v === undefined ? show_app_auto_resize : (show_app_auto_resize = v)));
-        ImGui.MenuItem('Constrained-resizing window', null, v => (v === undefined ? show_app_constrained_resize : (show_app_constrained_resize = v)));
-        ImGui.MenuItem('Simple overlay', null, v => (v === undefined ? show_app_simple_overlay : (show_app_simple_overlay = v)));
-        ImGui.MenuItem('Fullscreen window', null, v => (v === undefined ? show_app_fullscreen : (show_app_fullscreen = v)));
-        ImGui.MenuItem('Manipulating window titles', null, v => (v === undefined ? show_app_window_titles : (show_app_window_titles = v)));
-        ImGui.MenuItem('Custom rendering', null, v => (v === undefined ? show_app_custom_rendering : (show_app_custom_rendering = v)));
-        ImGui.MenuItem('Documents', null, v => (v === undefined ? show_app_documents : (show_app_documents = v)));
+        ImGui.MenuItem('Show Demo Window', null, v =>
+          v === undefined ? show_demo_window : (show_demo_window = v),
+        );
+        ImGui.MenuItem('Console', null, v =>
+          v === undefined ? show_app_console : (show_app_console = v),
+        );
+        ImGui.MenuItem('Log', null, v =>
+          v === undefined ? show_app_log : (show_app_log = v),
+        );
+        ImGui.MenuItem('Simple layout', null, v =>
+          v === undefined ? show_app_layout : (show_app_layout = v),
+        );
+        ImGui.MenuItem('Property editor', null, v =>
+          v === undefined
+            ? show_app_property_editor
+            : (show_app_property_editor = v),
+        );
+        ImGui.MenuItem('Long text display', null, v =>
+          v === undefined ? show_app_long_text : (show_app_long_text = v),
+        );
+        ImGui.MenuItem('Auto-resizing window', null, v =>
+          v === undefined ? show_app_auto_resize : (show_app_auto_resize = v),
+        );
+        ImGui.MenuItem('Constrained-resizing window', null, v =>
+          v === undefined
+            ? show_app_constrained_resize
+            : (show_app_constrained_resize = v),
+        );
+        ImGui.MenuItem('Simple overlay', null, v =>
+          v === undefined
+            ? show_app_simple_overlay
+            : (show_app_simple_overlay = v),
+        );
+        ImGui.MenuItem('Fullscreen window', null, v =>
+          v === undefined ? show_app_fullscreen : (show_app_fullscreen = v),
+        );
+        ImGui.MenuItem('Manipulating window titles', null, v =>
+          v === undefined
+            ? show_app_window_titles
+            : (show_app_window_titles = v),
+        );
+        ImGui.MenuItem('Custom rendering', null, v =>
+          v === undefined
+            ? show_app_custom_rendering
+            : (show_app_custom_rendering = v),
+        );
+        ImGui.MenuItem('Documents', null, v =>
+          v === undefined ? show_app_documents : (show_app_documents = v),
+        );
         ImGui.EndMenu();
       }
       //if (ImGui.MenuItem("MenuItem")) {} // You can also use MenuItem() inside a menu bar!
       if(ImGui.BeginMenu('Tools')) {
-        ImGui.MenuItem('Metrics/Debugger', null, v => (v === undefined ? show_app_metrics : (show_app_metrics = v)));
-        ImGui.MenuItem('Style Editor', null, v => (v === undefined ? show_app_style_editor : (show_app_style_editor = v)));
-        ImGui.MenuItem('About Dear ImGui', null, v => (v === undefined ? show_app_about : (show_app_about = v)));
+        ImGui.MenuItem('Metrics/Debugger', null, v =>
+          v === undefined ? show_app_metrics : (show_app_metrics = v),
+        );
+        ImGui.MenuItem('Style Editor', null, v =>
+          v === undefined ? show_app_style_editor : (show_app_style_editor = v),
+        );
+        ImGui.MenuItem('About Dear ImGui', null, v =>
+          v === undefined ? show_app_about : (show_app_about = v),
+        );
         ImGui.EndMenu();
       }
       ImGui.EndMenuBar();
@@ -312,7 +428,9 @@ function main() {
     if(nvg) {
       nvg.BeginFrame(...window.size, 1);
       console.log('nvg', nvg);
-      Clear(RGB(...(false /*show_light_bg()*/ ? [0x66, 0x88, 0xff] : [0, 0, 0])));
+      Clear(
+        RGB(...(false /*show_light_bg()*/ ? [0x66, 0x88, 0xff] : [0, 0, 0])),
+      );
 
       nvg.BeginPath();
 
@@ -351,4 +469,4 @@ const runMain = () => {
     console.log('ERROR:', error);
   }
 };
-import('console').catch(runMain).then(({ Console }) => ((globalThis.console = new Console({ inspectOptions: {} })), runMain()));
+import('console') .catch(runMain) .then( ({ Console }) => ( (globalThis.console = new Console({ inspectOptions: {} })), runMain() ), );
