@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 `qjs-imgui` is a native QuickJS C module that wraps [Dear ImGui](https://github.com/ocornut/imgui)
-(plus its GLFW + OpenGL2/3 backends). It compiles to a single shared object `imgui.so` that
+(plus its platform/renderer backends). It compiles to a single shared object `imgui.so` that
 QuickJS loads via `import * as ImGui from 'imgui'`. The JS API mirrors the C++ `ImGui::` namespace
 one-to-one — same function names, no prefix. See `README.md` for the full per-function JS signature
 reference.
@@ -78,16 +78,57 @@ and `_ctor`, `_constructor`/`_finalizer`/`_wrap` functions, a method table, and 
 They are registered as module exports in `js_imgui_init` (quickjs-imgui.cpp:3013) and declared in
 `js_init_module` (quickjs-imgui.cpp:3107).
 
-**Backends** (`quickjs-imgui-implementation.hpp`) expose `ImplGlfw`, `ImplOpenGL2`, `ImplOpenGL3`
-as objects of method tables (via `js_imgui_impl_object`). `ImGui.Init(impl...)` records backend
-objects and resolves their `InitFor<Type>` / `RenderDrawData` / `NewFrame` methods by name at
-frame time.
-
 **Constants** are defined as `JS_PROP_CONSTANT` tables in `quickjs-imgui-constants.hpp` and exposed
 as **nested namespace objects** on the module via `JS_OBJECT_DEF` entries in `js_imgui_static_funcs`
 (quickjs-imgui.cpp:~2960) — e.g. `ImGui.WindowFlags.NoTitleBar`, `ImGui.Cond.Always`,
 `ImGui.Col.Text`. (Note: `README.md` writes some flags in the flat `ImGuiWindowFlags_*` form;
 the actual exported shape is the nested `ImGui.<Group>.<Name>` object.)
+
+### Backends
+
+`quickjs-imgui-implementation.cpp`/`.hpp` hold the platform/renderer backend bindings. The intent
+is that the C module can expose **any backend ImGui ships that this build environment can compile**
+(GLFW, SDL2/3, Win32, DX9-12, Vulkan, Metal, OpenGL2/3, ...) — currently only GLFW + OpenGL2/OpenGL3
+are wired up, following the same pattern:
+- `quickjs-imgui-implementation.cpp` `#include`s the relevant `imgui/backends/imgui_impl_*.cpp`
+  translation units directly (conditioned on the OpenGL loader macros for the GL backends).
+- `quickjs-imgui-implementation.hpp` declares one method table per backend (e.g.
+  `js_imgui_impl_glfw[]`, `js_imgui_impl_opengl2[]`, `js_imgui_impl_opengl3[]`), each a small
+  single-dispatch switch like the struct wrappers above, calling the backend's
+  `ImGui_Impl<Backend>_*` C functions.
+- Each backend object is registered as a **module export** (`ImplGlfw`, `ImplOpenGL2`,
+  `ImplOpenGL3` — quickjs-imgui.cpp:3097-3099 and :3123-3125), not as a global — nothing about a
+  backend is wired up automatically.
+
+**Wiring is done entirely from JS.** `ImGui.Init(...backends)` (IMGUI_INIT, quickjs-imgui.cpp:541)
+just records whichever backend objects the caller passes in and resolves an `InitFor<Type>` method
+on each by name (via `[Symbol.toStringTag]`, e.g. `ImGui.ImplGlfw` → `InitForOpenGL` /
+`InitForVulkan` / `InitForOther`); those get called lazily from `ImGui.CreateContext()`. Per-frame
+calls (`NewFrame`, `RenderDrawData`, ...) are made directly by user JS on the imported backend
+objects — the C side does not drive the frame loop. See the "Typical frame loop" section of
+`README.md` for the JS-side pattern. **To add a new backend:** add its `.cpp` include (if any) to
+`quickjs-imgui-implementation.cpp`, add a method table + dispatch switch to
+`quickjs-imgui-implementation.hpp` following the existing GLFW/OpenGL2/OpenGL3 tables, then export
+it as a module export next to `ImplGlfw`/`ImplOpenGL2`/`ImplOpenGL3` in `js_imgui_init` and
+`js_init_module`. Gate the CMake sources/includes for the new backend behind a CMake option, the
+way GLFW/OpenGL are gated by `USE_GL3W`/`USE_GLEW`/`IMPL_OPENGL_ES2`.
+
+## Roadmap and bugs
+
+`TODO` and `BUGS` are plain lowercase-entry text files in the repo root — the roadmap and known
+bugs, respectively. Each entry is a line starting with `-`. Check them for planned work or known
+issues; add entries the same way when asked to note something down. Newly discovered bugs go at
+the end of `BUGS`, formatted like `../../../shish/BUGS`:
+
+```
+- <canonical-name>: <description>
+
+    <JS code that triggers it>
+
+```
+
+i.e. a `- name: description` line (description may wrap/continue as indented lines), a blank
+line, an indented JS repro snippet, then a trailing blank line before the next entry.
 
 ## Code style
 
