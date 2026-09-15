@@ -6,8 +6,6 @@ message("Building project [1;31m${PROJECT_NAME}[0m")
 option(USE_GL3W OFF "Use GL3W instead of internal loader")
 option(USE_GLEW OFF "Use GLEW instead of internal loader")
 option(IMPL_OPENGL_ES2 OFF "Use OpenGL ES2")
-option(BUILD_SHARED_MODULE "Build shared module (imgui.so)" ON)
-option(BUILD_STATIC_MODULE "Build static module (imgui.a)" OFF)
 
 cmake_minimum_required(VERSION 3.5)
 
@@ -18,6 +16,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/functions.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/check-flags.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindQuickJS.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/QuickJSModule.cmake)
+quickjs_module_options(SHARED_DEFAULT ON STATIC_DEFAULT OFF)
 
 if(USE_GL3W)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildGL3W.cmake)

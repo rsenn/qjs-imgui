@@ -1,3 +1,38 @@
+# quickjs_module_options([SHARED_DEFAULT <ON|OFF>] [STATIC_DEFAULT <ON|OFF>])
+#
+# Declares BUILD_SHARED_MODULES/BUILD_STATIC_MODULES the same way across
+# every qjs-* project, so a single -DBUILD_SHARED_MODULES=.../
+# -DBUILD_STATIC_MODULES=... passed to the top-level quickjs/ build reaches
+# every add_subdirectory()'d qjs-* submodule unchanged (same cache-variable
+# name everywhere). Guarded by NOT DEFINED so a value already set by the
+# caller - this project's own earlier option() call, or the outer build -
+# always wins; this macro only ever supplies the fallback default.
+#
+# WASI/Emscripten have no dlopen()-able shared-module story, so the shared
+# default is forced off and the static default forced on there regardless
+# of what the caller asked for.
+macro(quickjs_module_options)
+  cmake_parse_arguments(QMO "" "SHARED_DEFAULT;STATIC_DEFAULT" "" ${ARGN})
+  if(NOT DEFINED QMO_SHARED_DEFAULT)
+    set(QMO_SHARED_DEFAULT ON)
+  endif(NOT DEFINED QMO_SHARED_DEFAULT)
+  if(NOT DEFINED QMO_STATIC_DEFAULT)
+    set(QMO_STATIC_DEFAULT OFF)
+  endif(NOT DEFINED QMO_STATIC_DEFAULT)
+
+  if(WASI OR EMSCRIPTEN OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
+    set(QMO_SHARED_DEFAULT OFF)
+    set(QMO_STATIC_DEFAULT ON)
+  endif(WASI OR EMSCRIPTEN OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
+
+  if(NOT DEFINED BUILD_SHARED_MODULES)
+    option(BUILD_SHARED_MODULES "Build shared QuickJS module(s) (*.so)" ${QMO_SHARED_DEFAULT})
+  endif(NOT DEFINED BUILD_SHARED_MODULES)
+  if(NOT DEFINED BUILD_STATIC_MODULES)
+    option(BUILD_STATIC_MODULES "Build static QuickJS module(s) (*.a)" ${QMO_STATIC_DEFAULT})
+  endif(NOT DEFINED BUILD_STATIC_MODULES)
+endmacro(quickjs_module_options)
+
 function(config_module TARGET_NAME)
   if(QUICKJS_LIBRARY_DIR)
     set_target_properties(${TARGET_NAME} PROPERTIES LINK_DIRECTORIES "${QUICKJS_LIBRARY_DIR}")
@@ -236,7 +271,7 @@ function(make_module FNAME)
   #message(STATUS "${MSG}")
 
   if(WASI OR EMSCRIPTEN OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
-    set(BUILD_SHARED_MODULE OFF)
+    set(BUILD_SHARED_MODULES OFF)
   endif(WASI OR EMSCRIPTEN OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
 
   if(NOT WASI AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
@@ -247,7 +282,7 @@ function(make_module FNAME)
 
   #dump(VNAME ${VNAME}_SOURCES SOURCES)
 
-  if(BUILD_SHARED_MODULE)
+  if(BUILD_SHARED_MODULES)
     #add_library(${TARGET_NAME} MODULE ${SOURCES})
     add_library(${TARGET_NAME} SHARED ${SOURCES})
 
@@ -279,9 +314,9 @@ function(make_module FNAME)
       add_dependencies(${TARGET_NAME} ${DEPS})
     endif(DEPS)
 
-  endif(BUILD_SHARED_MODULE)
+  endif(BUILD_SHARED_MODULES)
 
-  if(BUILD_STATIC_MODULE)
+  if(BUILD_STATIC_MODULES)
     set(STATIC_TARGET_NAME ${TARGET_NAME}-static)
 
     # separate target from ${TARGET_NAME}: sources are recompiled without -fPIC here, vs with
@@ -313,23 +348,18 @@ function(make_module FNAME)
     write_module_cmake(${FNAME} "${DEPS}" "${LIBS};${LIBRARIES};${QUICKJS_LIBRARY}"
                         "${QUICKJS_MODULE_CFLAGS}")
 
-  endif(BUILD_STATIC_MODULE)
+  endif(BUILD_STATIC_MODULES)
 
   list(APPEND MODULES_SOURCES quickjs-${NAME}.c)
   set(MODULES_SOURCES "${MODULES_SOURCES}" PARENT_SCOPE)
 
 endfunction()
 
-if(NOT DEFINED BUILD_SHARED_MODULE)
-  option(BUILD_SHARED_MODULE "Build shared module" ON)
-endif(NOT DEFINED BUILD_SHARED_MODULE)
-if(NOT DEFINED BUILD_STATIC_MODULE)
-  option(BUILD_STATIC_MODULE "Build static module" OFF)
-endif(NOT DEFINED BUILD_STATIC_MODULE)
+quickjs_module_options(SHARED_DEFAULT ON STATIC_DEFAULT OFF)
 
 if(WASI OR EMSCRIPTEN)
   set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
-  set(BUILD_SHARED_MODULE OFF)
+  set(BUILD_SHARED_MODULES OFF)
 endif(WASI OR EMSCRIPTEN)
 
 if(WIN32 OR MINGW)
