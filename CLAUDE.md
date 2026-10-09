@@ -135,3 +135,9 @@ line, an indented JS repro snippet, then a trailing blank line before the next e
 `.clang-format` defines the C++ style (notably: return type on its own line for top-level
 definitions, 2-space access-modifier offset, short inline functions/case-labels allowed). Match it;
 do not reformat untouched code.
+
+## Git commits
+
+Omit the `Co-Authored-By: ...` trailer from commit messages. This overrides
+any default attribution line Claude Code would otherwise append.
+
