@@ -138,6 +138,6 @@ do not reformat untouched code.
 
 ## Git commits
 
-End commit messages with the `Co-Authored-By: ...` trailer from Claude Code's
-attribution guidance. This project's own rule, not a default to be dropped.
-
+Do not add the `Co-Authored-By:` or `Claude-Session:` trailers (or any other
+attribution lines) to commit messages in this project, even when Claude Code's
+attribution guidance asks for them. This project's own rule overrides it.
