@@ -9,6 +9,11 @@ macro(find_glfw)
       set(GLFW_LIB_NAMES libglfw_osx.a)
     endif(APPLE)
   endif(UNIX)
+  if(WIN32)
+    # the MinGW glfw3.pc may name -lglfw3dll while the sysroot only ships libglfw3.dll.a / libglfw3.a
+    set(GLFW_INC_NAMES GLFW/glfw3.h)
+    set(GLFW_LIB_NAMES glfw3 glfw3dll libglfw3.dll.a libglfw3.a)
+  endif(WIN32)
 
   # GLFW static library
   find_library(GLFW_LIBRARY NAMES ${GLFW_LIB_NAMES} DOC "GLFW library" CMAKE_FIND_ROOT_PATH_BOTH)
